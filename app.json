@@ -1,29 +1,32 @@
 {
   "expo": {
-    "name": "sjmpproject",
-    "slug": "sjmpproject",
+    "name": "SJMP Parish App",
+    "slug": "sjmp-parish-app",
+    "scheme": "sjmpapp", 
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/LOGO.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/LOGO.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.sjmpparishapp"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/LOGO.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.yourcompany.sjmpparishapp"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/LOGO.png"
     },
     "plugins": [
       "expo-web-browser",
