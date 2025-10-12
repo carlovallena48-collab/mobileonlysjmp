@@ -9,11 +9,15 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ImageBackground
+  ImageBackground,
+  SafeAreaView,
+  StatusBar
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useNavigation } from '@react-navigation/native';
 
 const HolyOrdenForm = () => {
+  const navigation = useNavigation();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -21,6 +25,7 @@ const HolyOrdenForm = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
@@ -52,13 +57,63 @@ const HolyOrdenForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validateForm()) {
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      // Gamitin ang email mula sa form mismo
+      const userEmail = formData.email.trim().toLowerCase();
+      
+      const response = await fetch('http://10.173.231.17:5000/api/holy_orders_requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          contactNumber: formData.contactNumber,
+          submittedByEmail: userEmail
+        }),
+      });
+
+      // Check response status
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
       Alert.alert(
-        'Submission Successful',
-        'Your Holy Orders application has been submitted successfully!',
-        [{ text: 'OK', onPress: () => console.log('Form submitted:', formData) }]
+        'Application Submitted!',
+        'Your Holy Orders application has been submitted successfully. We will contact you soon.',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Reset form
+              setFormData({
+                name: '',
+                email: '',
+                contactNumber: ''
+              });
+              navigation.goBack();
+            }
+          }
+        ]
       );
+    } catch (error) {
+      console.error('Submission error:', error);
+      Alert.alert(
+        'Connection Error', 
+        'Cannot connect to server. Please check your connection and try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -77,118 +132,151 @@ const HolyOrdenForm = () => {
   };
 
   return (
-    <ImageBackground
-      source={require('../assets/parish.jpg')} // Add your own background image
-      style={styles.background}
-      blurRadius={3}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar backgroundColor="#1a4d2a" barStyle="light-content" />
+      <ImageBackground
+        source={require('../assets/parish.jpg')}
+        style={styles.background}
+        blurRadius={2}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.card}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Icon name="church" size={40} color="#8B4513" />
-              <Text style={styles.title}>Holy Orders Application</Text>
-              <Text style={styles.subtitle}>
-                Answer the call to serve in God's ministry
-              </Text>
-            </View>
-
-            {/* Form */}
-            <View style={styles.form}>
-              {/* Name Field */}
-              <View style={styles.inputContainer}>
-                <View style={styles.labelContainer}>
-                  <Icon name="person" size={20} color="#666" style={styles.inputIcon} />
-                  <Text style={styles.label}>Full Name</Text>
-                </View>
-                <TextInput
-                  style={[
-                    styles.input,
-                    errors.name && styles.inputError
-                  ]}
-                  placeholder="Enter your full name"
-                  placeholderTextColor="#999"
-                  value={formData.name}
-                  onChangeText={(text) => handleInputChange('name', text)}
-                />
-                {errors.name && (
-                  <Text style={styles.errorText}>{errors.name}</Text>
-                )}
-              </View>
-
-              {/* Email Field */}
-              <View style={styles.inputContainer}>
-                <View style={styles.labelContainer}>
-                  <Icon name="email" size={20} color="#666" style={styles.inputIcon} />
-                  <Text style={styles.label}>Email Address</Text>
-                </View>
-                <TextInput
-                  style={[
-                    styles.input,
-                    errors.email && styles.inputError
-                  ]}
-                  placeholder="Enter your email address"
-                  placeholderTextColor="#999"
-                  value={formData.email}
-                  onChangeText={(text) => handleInputChange('email', text)}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                {errors.email && (
-                  <Text style={styles.errorText}>{errors.email}</Text>
-                )}
-              </View>
-
-              {/* Contact Number Field */}
-              <View style={styles.inputContainer}>
-                <View style={styles.labelContainer}>
-                  <Icon name="phone" size={20} color="#666" style={styles.inputIcon} />
-                  <Text style={styles.label}>Contact Number</Text>
-                </View>
-                <TextInput
-                  style={[
-                    styles.input,
-                    errors.contactNumber && styles.inputError
-                  ]}
-                  placeholder="Enter your contact number"
-                  placeholderTextColor="#999"
-                  value={formData.contactNumber}
-                  onChangeText={(text) => handleInputChange('contactNumber', text)}
-                  keyboardType="phone-pad"
-                />
-                {errors.contactNumber && (
-                  <Text style={styles.errorText}>{errors.contactNumber}</Text>
-                )}
-              </View>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSubmit}
-              >
-                <Icon name="send" size={20} color="#FFF" />
-                <Text style={styles.submitButtonText}>Submit Application</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Footer */}
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>
-                "The Lord does not look at the things people look at. People look at the outward appearance, but the Lord looks at the heart." - 1 Samuel 16:7
-              </Text>
-            </View>
+        {/* Header with Back Button */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-back" size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Holy Orders</Text>
+          <View style={styles.headerIcon}>
+            <Icon name="church" size={24} color="#FFF" />
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </ImageBackground>
+        </View>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.card}>
+              {/* Form Header */}
+              <View style={styles.formHeader}>
+                <View style={styles.iconContainer}>
+                  <Icon name="account_circle" size={50} color="#1a4d2a" />
+                </View>
+                <Text style={styles.title}>Vocational Calling</Text>
+                <Text style={styles.subtitle}>
+                  Answer God's call to serve in priestly ministry
+                </Text>
+              </View>
+
+              {/* Form */}
+              <View style={styles.form}>
+                {/* Name Field */}
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelContainer}>
+                    <Icon name="person" size={20} color="#1a4d2a" style={styles.inputIcon} />
+                    <Text style={styles.label}>Full Name</Text>
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      errors.name && styles.inputError
+                    ]}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#999"
+                    value={formData.name}
+                    onChangeText={(text) => handleInputChange('name', text)}
+                  />
+                  {errors.name && (
+                    <Text style={styles.errorText}>{errors.name}</Text>
+                  )}
+                </View>
+
+                {/* Email Field */}
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelContainer}>
+                    <Icon name="email" size={20} color="#1a4d2a" style={styles.inputIcon} />
+                    <Text style={styles.label}>Email Address</Text>
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      errors.email && styles.inputError
+                    ]}
+                    placeholder="Enter your email address"
+                    placeholderTextColor="#999"
+                    value={formData.email}
+                    onChangeText={(text) => handleInputChange('email', text)}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  {errors.email && (
+                    <Text style={styles.errorText}>{errors.email}</Text>
+                  )}
+                </View>
+
+                {/* Contact Number Field */}
+                <View style={styles.inputContainer}>
+                  <View style={styles.labelContainer}>
+                    <Icon name="phone" size={20} color="#1a4d2a" style={styles.inputIcon} />
+                    <Text style={styles.label}>Contact Number</Text>
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      errors.contactNumber && styles.inputError
+                    ]}
+                    placeholder="Enter your contact number"
+                    placeholderTextColor="#999"
+                    value={formData.contactNumber}
+                    onChangeText={(text) => handleInputChange('contactNumber', text)}
+                    keyboardType="phone-pad"
+                  />
+                  {errors.contactNumber && (
+                    <Text style={styles.errorText}>{errors.contactNumber}</Text>
+                  )}
+                </View>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                  onPress={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Text style={styles.submitButtonText}>Submitting...</Text>
+                  ) : (
+                    <>
+                      <Icon name="send" size={20} color="#FFF" />
+                      <Text style={styles.submitButtonText}>Submit Application</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Footer */}
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>
+                  "The Lord does not look at the things people look at. People look at the outward appearance, but the Lord looks at the heart." - 1 Samuel 16:7
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#1a4d2a',
+  },
   background: {
     flex: 1,
   },
@@ -197,9 +285,32 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
+    padding: 16,
   },
+  // Header Styles
+  header: {
+    backgroundColor: '#1a4d2a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2d6a3a',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: 'System',
+  },
+  headerIcon: {
+    padding: 8,
+  },
+  // Card Styles
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
@@ -213,26 +324,34 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(139, 69, 19, 0.2)',
+    borderColor: 'rgba(26, 77, 42, 0.2)',
+    marginTop: 10,
   },
-  header: {
+  formHeader: {
     alignItems: 'center',
     marginBottom: 30,
+  },
+  iconContainer: {
+    backgroundColor: 'rgba(26, 77, 42, 0.1)',
+    padding: 15,
+    borderRadius: 50,
+    marginBottom: 15,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#8B4513',
+    color: '#1a4d2a',
     marginTop: 10,
     textAlign: 'center',
-    fontFamily: 'System', // Use your preferred font family
+    fontFamily: 'System',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#2d6a3a',
     textAlign: 'center',
     marginTop: 5,
     fontStyle: 'italic',
+    lineHeight: 22,
   },
   form: {
     marginBottom: 20,
@@ -248,7 +367,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#1a4d2a',
     marginLeft: 8,
   },
   inputIcon: {
@@ -283,14 +402,14 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   submitButton: {
-    backgroundColor: '#8B4513',
+    backgroundColor: '#1a4d2a',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
     paddingVertical: 16,
     marginTop: 10,
-    shadowColor: '#8B4513',
+    shadowColor: '#1a4d2a',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -298,6 +417,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#95d5b2',
+    opacity: 0.7,
   },
   submitButtonText: {
     color: '#FFF',

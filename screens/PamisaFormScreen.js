@@ -10,18 +10,25 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
-  Animated
+  Modal
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 
 const PamisaFormScreen = () => {
   const [selectedIntention, setSelectedIntention] = useState('');
   const [names, setNames] = useState(['', '', '']);
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState(new Date());
   const [massSponsor, setMassSponsor] = useState('');
-  const [donation, setDonation] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // DateTime Picker States
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [dateInput, setDateInput] = useState('');
+  const [timeInput, setTimeInput] = useState('');
 
   const intentions = [
     { id: 1, name: 'Thanksgiving', icon: '🙏', color: '#4CAF50' },
@@ -39,7 +46,55 @@ const PamisaFormScreen = () => {
     setNames(newNames);
   };
 
-  const handleSubmit = () => {
+  // Date Picker Functions
+  const onDateChange = (event, date) => {
+    setShowDatePicker(false);
+    if (date) {
+      setSelectedDate(date);
+      const formattedDate = date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      });
+      setDateInput(formattedDate);
+    }
+  };
+
+  const showDatepicker = () => {
+    setShowDatePicker(true);
+  };
+
+  // Time Picker Functions
+  const onTimeChange = (event, time) => {
+    setShowTimePicker(false);
+    if (time) {
+      setSelectedTime(time);
+      const formattedTime = time.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      setTimeInput(formattedTime);
+    }
+  };
+
+  const showTimepicker = () => {
+    setShowTimePicker(true);
+  };
+
+  // Format date and time for submission
+  const formatDateTimeForSubmission = () => {
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    const timeStr = selectedTime.toTimeString().split(' ')[0];
+    return {
+      date: dateStr,
+      time: timeStr,
+      displayDate: dateInput,
+      displayTime: timeInput
+    };
+  };
+
+  const handleSubmit = async () => {
     if (!selectedIntention) {
       Alert.alert('Missing Information', 'Please select an intention for the Mass');
       return;
@@ -50,39 +105,73 @@ const PamisaFormScreen = () => {
       return;
     }
 
-    if (!date || !time) {
+    if (!dateInput || !timeInput) {
       Alert.alert('Missing Information', 'Please select date and time');
       return;
     }
 
-    const formData = {
-      intention: selectedIntention,
-      names: names.filter(name => name.trim() !== ''),
-      date,
-      time,
-      massSponsor,
-      donation
-    };
+    setIsSubmitting(true);
 
-    console.log('Form submitted:', formData);
-    
-    Alert.alert(
-      'Success!',
-      'Your Pamisa request has been submitted successfully.\n\nWe will contact you for confirmation.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            setSelectedIntention('');
-            setNames(['', '', '']);
-            setDate('');
-            setTime('');
-            setMassSponsor('');
-            setDonation('');
+    try {
+      const datetime = formatDateTimeForSubmission();
+      
+      const formData = {
+        intention: selectedIntention,
+        names: names.filter(name => name.trim() !== ''),
+        date: datetime.date,
+        time: datetime.time,
+        displayDate: datetime.displayDate,
+        displayTime: datetime.displayTime,
+        massSponsor: massSponsor || '',
+        donationNote: 'Cash donation to be given at parish office upon scheduling',
+        status: 'pending',
+        submittedAt: new Date().toISOString(),
+        requestNumber: `MASS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
+      };
+
+      const response = await fetch('http://10.173.231.17:5000/api/pamisa_requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      Alert.alert(
+        'Success! 🎉',
+        `Your Pamisa request has been submitted successfully.\n\n📋 Request Number: ${result.requestNumber}\n📅 Date: ${datetime.displayDate}\n⏰ Time: ${datetime.displayTime}\n\n💵 Donation: Please bring cash to the parish office when your schedule is confirmed.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Reset form
+              setSelectedIntention('');
+              setNames(['', '', '']);
+              setDateInput('');
+              setTimeInput('');
+              setSelectedDate(new Date());
+              setSelectedTime(new Date());
+              setMassSponsor('');
+            }
           }
-        }
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error('Submission error:', error);
+      Alert.alert(
+        'Connection Error', 
+        'Cannot connect to server. Please check your connection and try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderIntentionOption = (intention) => (
@@ -92,7 +181,7 @@ const PamisaFormScreen = () => {
         styles.optionButton,
         selectedIntention === intention.name && [
           styles.selectedOption,
-          { borderColor: intention.color }
+          { borderColor: intention.color, backgroundColor: `${intention.color}15` }
         ]
       ]}
       onPress={() => setSelectedIntention(intention.name)}
@@ -137,6 +226,7 @@ const PamisaFormScreen = () => {
           <View style={styles.titleContainer}>
             <Text style={styles.title}>Pamisa Request</Text>
             <View style={styles.titleUnderline} />
+            <Text style={styles.subtitle}>Schedule Your Mass Intention</Text>
           </View>
 
           {/* Intention Section */}
@@ -145,7 +235,7 @@ const PamisaFormScreen = () => {
             <Text style={styles.sectionSubtitle}>Select the purpose of this Mass</Text>
             
             <View style={styles.intentionsGrid}>
-              {intentions.map((intention, index) => (
+              {intentions.map((intention) => (
                 <View key={intention.id} style={styles.intentionItem}>
                   {renderIntentionOption(intention)}
                 </View>
@@ -157,7 +247,9 @@ const PamisaFormScreen = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Names for Intention</Text>
-              <Text style={styles.counterText}>{names.filter(name => name.trim() !== '').length}/3</Text>
+              <Text style={styles.counterText}>
+                {names.filter(name => name.trim() !== '').length}/3
+              </Text>
             </View>
             
             {names.map((name, index) => (
@@ -167,27 +259,21 @@ const PamisaFormScreen = () => {
                     styles.textInput,
                     name.trim() !== '' && styles.filledInput
                   ]}
-                  placeholder={`Name of person ${index + 1}`}
+                  placeholder={`Name of person ${index + 1}${selectedIntention === 'Soul' ? ' (First name only)' : ''}`}
                   placeholderTextColor="#999"
                   value={name}
                   onChangeText={(text) => handleNameChange(text, index)}
                 />
                 {name.trim() !== '' && (
                   <View style={styles.inputCheckmark}>
-                    <Text>✓</Text>
+                    <Text style={styles.checkmarkText}>✓</Text>
                   </View>
                 )}
               </View>
             ))}
-            
-            {selectedIntention === 'Soul' && (
-              <View style={styles.noteBox}>
-                <Text style={styles.noteText}>💡 Please enter first name only for soul intentions</Text>
-              </View>
-            )}
           </View>
 
-          {/* Date and Time */}
+          {/* Date and Time Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Schedule</Text>
             <View style={styles.row}>
@@ -195,25 +281,30 @@ const PamisaFormScreen = () => {
                 <View style={styles.inputLabel}>
                   <Text style={styles.labelText}>Date</Text>
                 </View>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="MM/DD/YYYY"
-                  placeholderTextColor="#999"
-                  value={date}
-                  onChangeText={setDate}
-                />
+                <TouchableOpacity 
+                  style={[styles.dateTimeButton, dateInput && styles.filledInput]}
+                  onPress={showDatepicker}
+                >
+                  <Text style={[styles.dateTimeText, !dateInput && styles.placeholderText]}>
+                    {dateInput || 'Select Date'}
+                  </Text>
+                
+                </TouchableOpacity>
               </View>
+              
               <View style={styles.halfInputContainer}>
                 <View style={styles.inputLabel}>
                   <Text style={styles.labelText}>Time</Text>
                 </View>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="HH:MM AM/PM"
-                  placeholderTextColor="#999"
-                  value={time}
-                  onChangeText={setTime}
-                />
+                <TouchableOpacity 
+                  style={[styles.dateTimeButton, timeInput && styles.filledInput]}
+                  onPress={showTimepicker}
+                >
+                  <Text style={[styles.dateTimeText, !timeInput && styles.placeholderText]}>
+                    {timeInput || 'Select Time'}
+                  </Text>
+                  
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -232,39 +323,73 @@ const PamisaFormScreen = () => {
             />
           </View>
 
-          {/* Donation */}
+          {/* Donation Information */}
           <View style={styles.section}>
-            <View style={styles.inputLabel}>
-              <Text style={styles.labelText}>Donation (Optional)</Text>
-            </View>
-            <View style={styles.donationContainer}>
-              <View style={styles.pesoContainer}>
-                <Text style={styles.pesoSign}>₱</Text>
+            <View style={styles.donationInfoCard}>
+              <Text style={styles.donationIcon}>💵</Text>
+              <View style={styles.donationTextContainer}>
+                <Text style={styles.donationTitle}>Donation</Text>
+                <Text style={styles.donationDescription}>
+                  Cash donations will be collected at the parish office when your mass schedule is confirmed.
+                </Text>
+               
               </View>
-              <TextInput
-                style={[styles.textInput, styles.donationInput]}
-                placeholder="0.00"
-                placeholderTextColor="#999"
-                keyboardType="numeric"
-                value={donation}
-                onChangeText={setDonation}
-              />
             </View>
           </View>
+
+          {/* DateTime Pickers */}
+          {showDatePicker && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onDateChange}
+              minimumDate={new Date()}
+            />
+          )}
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={selectedTime}
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onTimeChange}
+            />
+          )}
 
           {/* Submit Button */}
           <TouchableOpacity 
             style={[
               styles.submitButton,
-              (!selectedIntention || names.every(name => name.trim() === '') || !date || !time) && 
+              (!selectedIntention || names.every(name => name.trim() === '') || !dateInput || !timeInput || isSubmitting) && 
               styles.submitButtonDisabled
             ]} 
             onPress={handleSubmit}
-            disabled={!selectedIntention || names.every(name => name.trim() === '') || !date || !time}
+            disabled={!selectedIntention || names.every(name => name.trim() === '') || !dateInput || !timeInput || isSubmitting}
           >
-            <Text style={styles.submitButtonText}>Submit Pamisa Request</Text>
-            <Text style={styles.submitButtonSubtext}>We'll contact you for confirmation</Text>
+            {isSubmitting ? (
+              <Text style={styles.submitButtonText}>Submitting...</Text>
+            ) : (
+              <>
+                <Text style={styles.submitButtonText}>Submit Pamisa Request</Text>
+                <Text style={styles.submitButtonSubtext}>
+                  {dateInput && timeInput ? 
+                    `Scheduled for ${dateInput} at ${timeInput}` : 
+                    'We\'ll contact you for confirmation'
+                  }
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
+
+          {/* Instructions */}
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsTitle}>📋 Important Notes:</Text>
+            <Text style={styles.instructionItem}>• Mass schedules are subject to availability</Text>
+            <Text style={styles.instructionItem}>• You will receive a confirmation call</Text>
+            <Text style={styles.instructionItem}>• Bring your donation to the parish office</Text>
+            <Text style={styles.instructionItem}>• Arrive 15 minutes before your scheduled mass</Text>
+          </View>
         </View>
 
         {/* Footer */}
@@ -285,7 +410,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    backgroundColor: '#667eea',
     padding: 30,
     paddingTop: 50,
     alignItems: 'center',
@@ -350,6 +475,11 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     marginBottom: 8,
   },
+  subtitle: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginTop: 5,
+  },
   titleUnderline: {
     width: 60,
     height: 4,
@@ -398,14 +528,6 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
     borderRadius: 15,
     backgroundColor: '#f8f9fa',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
   },
   selectedOption: {
     backgroundColor: '#fff',
@@ -444,14 +566,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#2c3e50',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
   },
   filledInput: {
     borderColor: '#667eea',
@@ -467,6 +581,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  checkmarkText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   inputLabel: {
     marginBottom: 8,
@@ -484,38 +603,61 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 5,
   },
-  donationContainer: {
+  dateTimeButton: {
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: '#fff',
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  pesoContainer: {
-    backgroundColor: '#667eea',
-    padding: 16,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    marginRight: -2,
+  dateTimeText: {
+    fontSize: 16,
+    color: '#2c3e50',
   },
-  pesoSign: {
+  placeholderText: {
+    color: '#999',
+  },
+  calendarIcon: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
   },
-  donationInput: {
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
+  clockIcon: {
+    fontSize: 18,
+  },
+  donationInfoCard: {
+    backgroundColor: '#f0f7ff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  donationIcon: {
+    fontSize: 24,
+    marginRight: 12,
+    marginTop: 2,
+  },
+  donationTextContainer: {
     flex: 1,
   },
-  noteBox: {
-    backgroundColor: '#fff3cd',
-    padding: 12,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#ffc107',
-    marginTop: 10,
+  donationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2196F3',
+    marginBottom: 4,
   },
-  noteText: {
+  donationDescription: {
+    fontSize: 14,
+    color: '#495057',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  donationNote: {
     fontSize: 12,
-    color: '#856404',
+    color: '#666',
     fontStyle: 'italic',
   },
   submitButton: {
@@ -524,18 +666,10 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     marginTop: 10,
-    shadowColor: '#667eea',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    marginBottom: 20,
   },
   submitButtonDisabled: {
     backgroundColor: '#bdc3c7',
-    shadowColor: '#bdc3c7',
   },
   submitButtonText: {
     color: '#fff',
@@ -546,6 +680,26 @@ const styles = StyleSheet.create({
   submitButtonSubtext: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
+    textAlign: 'center',
+  },
+  instructionsCard: {
+    backgroundColor: '#fff9e6',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+    borderRadius: 12,
+    padding: 16,
+  },
+  instructionsTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 8,
+  },
+  instructionItem: {
+    fontSize: 12,
+    color: '#856404',
+    marginBottom: 4,
+    lineHeight: 16,
   },
   footer: {
     padding: 20,

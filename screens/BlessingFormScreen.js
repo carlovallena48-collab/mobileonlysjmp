@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, Platform } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ScrollView, 
+  Alert, 
+  Dimensions, 
+  Platform,
+  Image 
+} from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Get screen width for responsive sizing
@@ -30,6 +41,7 @@ const BlessingFormScreen = () => {
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedTime, setSelectedTime] = useState(new Date());
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -82,7 +94,7 @@ const BlessingFormScreen = () => {
         }
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         // Check required fields
         if (!formData.name || !formData.address || !formData.contactNumber || !formData.date || !formData.time || !formData.blessingType) {
             Alert.alert('Kulang sa Porma', 'Paki-kumpleto po ang inyong Pangalan, Address, Contact, Petsa, Oras, at Piliin ang Uri ng Pagbasbas.');
@@ -95,19 +107,64 @@ const BlessingFormScreen = () => {
             return;
         }
 
-        console.log('Form submitted:', formData);
-        Alert.alert('Tagumpay!', 'Matagumpay na naipadala ang inyong kahilingan! Kokontakin po namin kayo para sa kumpirmasyon.');
+        setIsSubmitting(true);
 
-        // Reset form data after successful submission
-        setFormData({
-            name: '',
-            blessingType: '',
-            requestForDetails: '',
-            address: '',
-            contactNumber: '',
-            date: '',
-            time: ''
-        });
+        try {
+            const submissionData = {
+                name: formData.name,
+                blessingType: formData.blessingType,
+                requestForDetails: formData.requestForDetails || '',
+                address: formData.address,
+                contactNumber: formData.contactNumber,
+                date: formData.date,
+                time: formData.time,
+                status: 'pending',
+                submittedAt: new Date().toISOString(),
+                requestNumber: `BLESS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
+            };
+
+            const response = await fetch('http://10.173.231.17:5000/api/blessing_requests', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(submissionData),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            Alert.alert(
+                'Tagumpay! 🎉', 
+                `Matagumpay na naipadala ang inyong kahilingan!\n\n📋 Request Number: ${result.requestNumber}\n📅 Petsa: ${formData.date}\n⏰ Oras: ${formData.time}\n\nKokontakin po namin kayo para sa kumpirmasyon.`
+            );
+
+            // Reset form data after successful submission
+            setFormData({
+                name: '',
+                blessingType: '',
+                requestForDetails: '',
+                address: '',
+                contactNumber: '',
+                date: '',
+                time: ''
+            });
+            setSelectedDate(new Date());
+            setSelectedTime(new Date());
+
+        } catch (error) {
+            console.error('Submission error:', error);
+            Alert.alert(
+                'Connection Error', 
+                'Cannot connect to server. Please check your connection and try again.'
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const isOtherSelected = formData.blessingType === 'OTHER';
@@ -122,8 +179,12 @@ const BlessingFormScreen = () => {
                     <Text style={styles.addressText}>San Jose, Rodriguez, Rizal</Text>
                     <Text style={styles.contactText}>Cellphone No.: 0967-431-6482</Text>
                 </View>
-                <View style={styles.logoPlaceholder}>
-                    <Text style={styles.logoText}>⛪</Text>
+                <View style={styles.logoContainer}>
+                    <Image 
+                        source={require('../assets/LOGO.png')}
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                    />
                 </View>
             </View>
 
@@ -212,27 +273,39 @@ const BlessingFormScreen = () => {
 
                 {/* Date and Time Group - Scheduling Card Design */}
                 <View style={styles.dateTimeGroupContainer}>
-                    <Text style={styles.dateTimeHeader}>Iskedyul ng Pagbasbas (SCHEDULE PREFERENCE) 📅</Text>
+                    <Text style={styles.dateTimeHeader}>Iskedyul ng Pagbasbas (SCHEDULE PREFERENCE) </Text>
                     <View style={styles.dateTimeGroup}>
                         {/* Date Picker */}
                         <View style={[styles.inputGroup, styles.halfWidthInput, { marginBottom: 0 }]}>
                             <Text style={styles.label}>Nais na Petsa (PREFERRED DATE):</Text>
-                            <TouchableOpacity style={styles.pickerButton} onPress={showDatePickerModal}>
+                            <TouchableOpacity 
+                                style={[
+                                    styles.pickerButton, 
+                                    formData.date && styles.pickerButtonFilled
+                                ]} 
+                                onPress={showDatePickerModal}
+                            >
                                 <Text style={formData.date ? styles.pickerButtonText : styles.pickerButtonPlaceholder}>
                                     {formData.date || 'Piliin ang Petsa'}
                                 </Text>
-                                <Text style={styles.calendarIcon}></Text>
+                              
                             </TouchableOpacity>
                         </View>
 
                         {/* Time Picker */}
                         <View style={[styles.inputGroup, styles.halfWidthInput, { marginBottom: 0 }]}>
                             <Text style={styles.label}>Nais na Oras (PREFERRED TIME):</Text>
-                            <TouchableOpacity style={styles.pickerButton} onPress={showTimePickerModal}>
+                            <TouchableOpacity 
+                                style={[
+                                    styles.pickerButton,
+                                    formData.time && styles.pickerButtonFilled
+                                ]} 
+                                onPress={showTimePickerModal}
+                            >
                                 <Text style={formData.time ? styles.pickerButtonText : styles.pickerButtonPlaceholder}>
                                     {formData.time || 'Piliin ang Oras'}
                                 </Text>
-                                <Text style={styles.clockIcon}></Text>
+                               
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -260,9 +333,29 @@ const BlessingFormScreen = () => {
                 )}
 
                 {/* Submit Button */}
-                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                    <Text style={styles.submitButtonText}>IPASA ANG KAHILINGAN (SUBMIT REQUEST)</Text>
+                <TouchableOpacity 
+                    style={[
+                        styles.submitButton, 
+                        isSubmitting && styles.submitButtonDisabled
+                    ]} 
+                    onPress={handleSubmit}
+                    disabled={isSubmitting}
+                >
+                    {isSubmitting ? (
+                        <Text style={styles.submitButtonText}>ISINUSUMITE...</Text>
+                    ) : (
+                        <Text style={styles.submitButtonText}>IPASA ANG KAHILINGAN (SUBMIT REQUEST)</Text>
+                    )}
                 </TouchableOpacity>
+
+                {/* Instructions */}
+                <View style={styles.instructionsCard}>
+                    <Text style={styles.instructionsTitle}>📋 Mahalagang Paalala:</Text>
+                    <Text style={styles.instructionItem}>• Ang schedule ay subject sa availability ng pari</Text>
+                    <Text style={styles.instructionItem}>• Kokontakin ka namin para sa kumpirmasyon</Text>
+                 
+                    <Text style={styles.instructionItem}>• Magdala ng mga kailangan para sa seremonya</Text>
+                </View>
             </View>
             <View style={{ height: 50 }} />
         </ScrollView>
@@ -326,19 +419,33 @@ const styles = StyleSheet.create({
         color: '#BDBDBD',
         marginTop: 8,
     },
-    logoPlaceholder: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+    logoContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 15,
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: COLOR_ACCENT,
+        padding: 5,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 3,
+            },
+            android: {
+                elevation: 6,
+            },
+        }),
     },
-    logoText: {
-        fontSize: 30,
+    logoImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 35,
     },
 
     // Form Card Styles
@@ -460,13 +567,17 @@ const styles = StyleSheet.create({
     // Picker Button Styles
     pickerButton: {
         borderWidth: 2,
-        borderColor: COLOR_ACCENT,
+        borderColor: '#E0E0E0',
         borderRadius: 15,
         padding: 10,
         backgroundColor: '#FFFFFF',
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    pickerButtonFilled: {
+        borderColor: COLOR_ACCENT,
+        backgroundColor: '#F1F8E9',
     },
     pickerButtonText: {
         fontSize: 16,
@@ -478,10 +589,10 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     calendarIcon: {
-        fontSize: 20,
+        fontSize: 18,
     },
     clockIcon: {
-        fontSize: 20,
+        fontSize: 18,
     },
 
     // Submit Button Styles
@@ -503,12 +614,37 @@ const styles = StyleSheet.create({
             },
         }),
     },
+    submitButtonDisabled: {
+        backgroundColor: '#A5D6A7',
+    },
     submitButtonText: {
         color: COLOR_TEXT_LIGHT,
         fontSize: 18,
         fontWeight: 'bold',
         letterSpacing: 1.2,
         textTransform: 'uppercase',
+    },
+
+    // Instructions Card
+    instructionsCard: {
+        backgroundColor: '#FFF3E0',
+        borderLeftWidth: 4,
+        borderLeftColor: '#FF9800',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 20,
+    },
+    instructionsTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#E65100',
+        marginBottom: 8,
+    },
+    instructionItem: {
+        fontSize: 12,
+        color: '#E65100',
+        marginBottom: 4,
+        lineHeight: 16,
     },
 });
 

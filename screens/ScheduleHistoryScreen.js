@@ -20,7 +20,7 @@ const SECONDARY_COLOR = "#34d399";
 const BACKGROUND_COLOR = "#f0fdfa";
 const CARD_BACKGROUND = "#ffffff";
 
-// API URL - Updated to use user email
+// API URL
 const API_URL = "http://10.173.231.17:5000/api";
 const USER_STORAGE_KEY = '@userData';
 
@@ -108,20 +108,18 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     switch (sacrament) {
       case 'Baptism':
         return 'water-outline';
-      case 'Matrimony':
-      case 'Kasal':
-        return 'heart-outline';
-      case 'Eucharist':
-        return 'wine-outline';
-      case 'Confirmation':
       case 'Kumpil':
         return 'flame-outline';
-      case 'Reconciliation':
-        return 'chatbubbles-outline';
-      case 'Anointing of the Sick':
-        return 'medkit-outline';
+      case 'Kasal':
+        return 'heart-outline';
+      case 'Pamisa':
+        return 'book-outline';
+      case 'Blessing':
+        return 'star-outline';
       case 'Holy Orders':
         return 'person-add-outline';
+      case 'First Communion':
+        return 'wine-outline';
       default:
         return 'calendar-outline';
     }
@@ -152,22 +150,18 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     }
   };
 
-  // Enhanced function to get sacrament-specific details with payment and reason data
+  // Enhanced function to get sacrament-specific details
   const getSacramentDetails = (sacrament, data) => {
-    // IMPORTANT FIX: Include 'reason' field along with rejectionReason and cancellationReason
-    const rejectionReason = data.rejectionReason || data.reason || '';
-    const cancellationReason = data.cancellationReason || data.reason || '';
-    
     const baseDetails = {
       name: 'Not specified',
       date: 'Date not set',
       time: 'Time not set',
       details: `${sacrament} request`,
       paymentStatus: data.paymentStatus || 'unpaid',
-      rejectionReason: rejectionReason,
-      cancellationReason: cancellationReason,
+      rejectionReason: data.rejectionReason || data.reason || '',
+      cancellationReason: data.cancellationReason || data.reason || '',
       adminNotes: data.adminNotes || '',
-      amount: data.amount || '0',
+      amount: data.amount || data.fee || data.donation || '0',
       paymentDate: data.paymentDate ? formatDate(data.paymentDate) : null,
       submittedDate: formatDate(data.createdAt || data.submittedDate),
     };
@@ -179,8 +173,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           name: data.name || 'Not specified',
           date: formatDate(data.baptismDate),
           time: data.baptismTime || 'Time not set',
-          details: `Baptismal request for ${data.name}. ${data.fatherName ? `Father: ${data.fatherName}` : ''} ${data.motherName ? `Mother: ${data.motherName}` : ''}`,
-          amount: data.amount || '500',
+          details: `Baptismal request for ${data.name}`,
+          amount: data.fee || '500',
         };
       case 'Kumpil':
         return {
@@ -188,8 +182,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           name: data.confirmandName || 'Not specified',
           date: formatDate(data.kumpilDate),
           time: data.kumpilTime || 'Time not set',
-          details: `Confirmation request for ${data.confirmandName}. ${data.age ? `Age: ${data.age}` : ''}`,
-          amount: data.amount || '300',
+          details: `Confirmation request for ${data.confirmandName}`,
+          amount: '300',
         };
       case 'Kasal':
         return {
@@ -197,8 +191,44 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           name: `${data.groomName || 'Groom'} & ${data.brideName || 'Bride'}`,
           date: formatDate(data.marriageDate),
           time: data.marriageTime || 'Time not set',
-          details: `Marriage request for ${data.groomName || 'Groom'} and ${data.brideName || 'Bride'}`,
-          amount: data.amount || '2000',
+          details: `Marriage request`,
+          amount: '2000',
+        };
+      case 'Pamisa':
+        return {
+          ...baseDetails,
+          name: data.names?.[0] || 'Not specified',
+          date: data.displayDate || data.date || 'Date not set',
+          time: data.displayTime || data.time || 'Time not set',
+          details: `Mass intention: ${data.intention || 'Not specified'}`,
+          amount: data.donation || '0',
+        };
+      case 'Blessing':
+        return {
+          ...baseDetails,
+          name: data.name || 'Not specified',
+          date: data.displayDate || data.date || 'Date not set',
+          time: data.displayTime || data.time || 'Time not set',
+          details: `Blessing for: ${data.blessingType || 'Not specified'}`,
+          amount: '0',
+        };
+      case 'Holy Orders':
+        return {
+          ...baseDetails,
+          name: data.name || 'Not specified',
+          date: 'To be scheduled',
+          time: 'To be scheduled',
+          details: `Vocational calling application`,
+          amount: '0',
+        };
+      case 'First Communion':
+        return {
+          ...baseDetails,
+          name: data.childName || data.name || 'Not specified',
+          date: formatDate(data.communionDate),
+          time: data.communionTime || 'Time not set',
+          details: `First Communion request`,
+          amount: '300',
         };
       default:
         return baseDetails;
@@ -207,14 +237,13 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 
   // Function to show reason modal
   const showReasonModal = (reason, type) => {
-    console.log('Showing reason modal:', { reason, type });
     setSelectedReason(reason);
     setSelectedType(type);
     setModalVisible(true);
   };
 
-  // Enhanced function to fetch ALL sacrament requests from API by USER EMAIL
-  const fetchAllRequests = async (email) => {
+  // IMPROVED: Fetch all requests using API endpoints
+  const fetchAllRequestsByEmail = async (email) => {
     if (!email) {
       setLoading(false);
       setRefreshing(false);
@@ -222,81 +251,53 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     }
 
     try {
-      console.log('Fetching all sacrament requests for:', email);
+      console.log('🔍 Fetching all requests for:', email);
       
-      // Fetch requests from all sacrament endpoints
+      // Fetch from individual API endpoints
       const endpoints = [
-        `${API_URL}/baptismrequests/${email}`,
-        `${API_URL}/kumpil_requests`,
-        `${API_URL}/marriage_requests`
+        { url: `${API_URL}/baptismrequests/${email}`, type: 'Baptism' },
+        { url: `${API_URL}/kumpil_requests/${email}`, type: 'Kumpil' },
+        { url: `${API_URL}/marriage_requests/${email}`, type: 'Kasal' },
+        { url: `${API_URL}/pamisa_requests/${email}`, type: 'Pamisa' },
+        { url: `${API_URL}/blessing_requests/${email}`, type: 'Blessing' },
+        { url: `${API_URL}/holy_orders_requests/${email}`, type: 'Holy Orders' },
+        { url: `${API_URL}/first_communion_requests/${email}`, type: 'First Communion' }
       ];
-
-      const responses = await Promise.allSettled(
-        endpoints.map(endpoint => 
-          fetch(endpoint).then(res => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-          })
-        )
-      );
 
       let allData = [];
 
-      // Process baptism requests
-      if (responses[0].status === 'fulfilled' && Array.isArray(responses[0].value)) {
-        const baptismRequests = responses[0].value
-          .filter(item => item.submittedByEmail === email)
-          .map(item => {
-            console.log('Baptism item reason:', item.reason); // Debug log
-            return {
-              id: item._id?.$oid || item._id || Math.random().toString(),
-              sacrament: 'Baptism',
-              ...getSacramentDetails('Baptism', item),
-              status: item.status || 'pending',
-              icon: getSacramentIcon('Baptism'),
-              fullData: item,
-              collection: 'baptismrequests'
-            };
-          });
-        allData = [...allData, ...baptismRequests];
-      }
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`📡 Fetching from: ${endpoint.url}`);
+          
+          const response = await fetch(endpoint.url);
+          
+          if (!response.ok) {
+            console.log(`❌ ${endpoint.type} endpoint failed:`, response.status);
+            continue;
+          }
 
-      // Process kumpil requests
-      if (responses[1].status === 'fulfilled' && Array.isArray(responses[1].value)) {
-        const kumpilRequests = responses[1].value
-          .filter(item => item.submittedByEmail === email)
-          .map(item => {
-            console.log('Kumpil item reason:', item.reason); // Debug log
-            return {
-              id: item._id?.$oid || item._id || Math.random().toString(),
-              sacrament: 'Kumpil',
-              ...getSacramentDetails('Kumpil', item),
-              status: item.status || 'pending',
-              icon: getSacramentIcon('Kumpil'),
-              fullData: item,
-              collection: 'kumpilrequests'
-            };
-          });
-        allData = [...allData, ...kumpilRequests];
-      }
+          const data = await response.json();
+          console.log(`✅ ${endpoint.type} response:`, Array.isArray(data) ? data.length : 'Not array');
 
-      // Process marriage requests
-      if (responses[2].status === 'fulfilled' && Array.isArray(responses[2].value)) {
-        const marriageRequests = responses[2].value
-          .filter(item => item.submittedByEmail === email)
-          .map(item => {
-            console.log('Marriage item reason:', item.reason); // Debug log
-            return {
+          if (Array.isArray(data)) {
+            // Map to common format
+            const formattedRequests = data.map(item => ({
               id: item._id?.$oid || item._id || Math.random().toString(),
-              sacrament: 'Kasal',
-              ...getSacramentDetails('Kasal', item),
+              sacrament: endpoint.type,
+              ...getSacramentDetails(endpoint.type, item),
               status: item.status || 'pending',
-              icon: getSacramentIcon('Kasal'),
+              icon: getSacramentIcon(endpoint.type),
               fullData: item,
-              collection: 'marriagerequests'
-            };
-          });
-        allData = [...allData, ...marriageRequests];
+              collection: endpoint.type.toLowerCase().replace(' ', '') + 'requests'
+            }));
+
+            allData = [...allData, ...formattedRequests];
+            console.log(`✅ ${endpoint.type} user requests:`, formattedRequests.length);
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching ${endpoint.type}:`, error);
+        }
       }
 
       // Sort by date (newest first)
@@ -308,16 +309,19 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 
       setAllRequests(allData);
       
-      console.log(`✅ Loaded ${allData.length} total requests`);
-      // Debug: Check if reasons are being captured
-      allData.forEach((item, index) => {
-        if (item.status === 'rejected' || item.status === 'cancelled') {
-          console.log(`Item ${index} - Status: ${item.status}, RejectionReason: ${item.rejectionReason}, CancellationReason: ${item.cancellationReason}`);
-        }
+      console.log(`✅ Total loaded: ${allData.length} requests`);
+      console.log('📊 Breakdown:', {
+        baptism: allData.filter(item => item.sacrament === 'Baptism').length,
+        kumpil: allData.filter(item => item.sacrament === 'Kumpil').length,
+        kasal: allData.filter(item => item.sacrament === 'Kasal').length,
+        pamisa: allData.filter(item => item.sacrament === 'Pamisa').length,
+        blessing: allData.filter(item => item.sacrament === 'Blessing').length,
+        holyOrders: allData.filter(item => item.sacrament === 'Holy Orders').length,
+        firstCommunion: allData.filter(item => item.sacrament === 'First Communion').length
       });
 
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      console.error('❌ Error fetching requests:', error);
       Alert.alert('Error', 'Failed to load your requests. Please check your connection.');
       setAllRequests([]);
     } finally {
@@ -334,7 +338,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         if (userData) {
           const user = JSON.parse(userData);
           setUserEmail(user.email);
-          await fetchAllRequests(user.email);
+          await fetchAllRequestsByEmail(user.email);
         } else {
           setLoading(false);
           setAllRequests([]);
@@ -352,7 +356,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
   const handleRefresh = async () => {
     if (userEmail) {
       setRefreshing(true);
-      await fetchAllRequests(userEmail);
+      await fetchAllRequestsByEmail(userEmail);
     }
   };
 
@@ -375,18 +379,24 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
       case 'Kasal':
         navigation.navigate('MarriageForm');
         break;
+      case 'Pamisa':
+        navigation.navigate('PamisaForm');
+        break;
+      case 'Blessing':
+        navigation.navigate('BlessingForm');
+        break;
+      case 'Holy Orders':
+        navigation.navigate('HolyOrdersForm');
+        break;
+      case 'First Communion':
+        navigation.navigate('FirstCommunionForm');
+        break;
       default:
         Alert.alert('Info', 'Form not available for this sacrament.');
     }
   };
 
   const renderItemCard = (item) => {
-    console.log('Rendering item:', { 
-      status: item.status, 
-      rejectionReason: item.rejectionReason,
-      cancellationReason: item.cancellationReason 
-    }); // Debug log
-    
     return (
       <TouchableOpacity
         key={item.id}
@@ -408,14 +418,15 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           <Text style={styles.detailText}>Schedule: {item.date} at {item.time}</Text>
         </View>
 
-        <View style={styles.detailRow}>
-          <Ionicons name="cash-outline" size={16} color="#6b7280" style={styles.detailIcon} />
-          <Text style={styles.detailText}>
-            Payment: {item.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'} 
-            {item.amount && ` - ₱${item.amount}`}
-            {item.paymentDate && ` on ${item.paymentDate}`}
-          </Text>
-        </View>
+        {item.amount !== '0' && (
+          <View style={styles.detailRow}>
+            <Ionicons name="cash-outline" size={16} color="#6b7280" style={styles.detailIcon} />
+            <Text style={styles.detailText}>
+              Payment: {item.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'} 
+              {item.amount && ` - ₱${item.amount}`}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.detailRow}>
           <Ionicons name="information-circle-outline" size={16} color="#6b7280" style={styles.detailIcon} />
@@ -511,11 +522,11 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           </ScrollView>
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={50} color="#9ca3af" />
-            <Text style={styles.emptyText}>No sacrament requests found.</Text>
+            <Ionicons name="calendar-outline" size={64} color="#9ca3af" />
+            <Text style={styles.emptyText}>No sacrament requests found</Text>
             <Text style={styles.emptySubtext}>
               {userEmail 
-                ? `You haven't submitted any sacrament requests yet.`
+                ? "You haven't submitted any sacrament requests yet."
                 : 'Please login to view your requests.'
               }
             </Text>
@@ -526,7 +537,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
                 onPress={() => navigateToSacramentForm('Baptism')}
               >
                 <Ionicons name="water-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Baptism Request</Text>
+                <Text style={styles.submitButtonText}>Baptism</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -534,7 +545,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
                 onPress={() => navigateToSacramentForm('Kumpil')}
               >
                 <Ionicons name="flame-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Kumpil Request</Text>
+                <Text style={styles.submitButtonText}>Kumpil</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -542,7 +553,39 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
                 onPress={() => navigateToSacramentForm('Kasal')}
               >
                 <Ionicons name="heart-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Marriage Request</Text>
+                <Text style={styles.submitButtonText}>Marriage</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.submitButton}
+                onPress={() => navigateToSacramentForm('Pamisa')}
+              >
+                <Ionicons name="book-outline" size={20} color="white" />
+                <Text style={styles.submitButtonText}>Pamisa</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.submitButton}
+                onPress={() => navigateToSacramentForm('Blessing')}
+              >
+                <Ionicons name="star-outline" size={20} color="white" />
+                <Text style={styles.submitButtonText}>Blessing</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.submitButton}
+                onPress={() => navigateToSacramentForm('Holy Orders')}
+              >
+                <Ionicons name="person-add-outline" size={20} color="white" />
+                <Text style={styles.submitButtonText}>Holy Orders</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.submitButton}
+                onPress={() => navigateToSacramentForm('First Communion')}
+              >
+                <Ionicons name="wine-outline" size={20} color="white" />
+                <Text style={styles.submitButtonText}>First Communion</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -731,29 +774,29 @@ const styles = StyleSheet.create({
     padding: 40 
   },
   emptyText: { 
-    fontSize: 18, 
+    fontSize: 20, 
     fontWeight: "600", 
     color: "#6b7280", 
-    marginTop: 15,
+    marginTop: 20,
     textAlign: 'center',
   },
   emptySubtext: { 
-    fontSize: 14, 
+    fontSize: 16, 
     color: "#9ca3af", 
-    marginTop: 5, 
+    marginTop: 10, 
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 22,
   },
   buttonContainer: {
-    marginTop: 20,
+    marginTop: 30,
     width: '100%',
-    gap: 10,
+    gap: 12,
   },
   submitButton: {
     backgroundColor: PRIMARY_COLOR,
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 15,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

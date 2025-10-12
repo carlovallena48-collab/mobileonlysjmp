@@ -89,6 +89,7 @@ export default function FirstCommunionFormScreen({ navigation }) {
     };
 
     loadUserData();
+    clearOldComments(); // Clear any old dummy comments
     loadComments();
     checkServerStatus();
   }, []);
@@ -98,6 +99,16 @@ export default function FirstCommunionFormScreen({ navigation }) {
       fetchExistingSchedule();
     }
   }, [userEmail]);
+
+  // Function to clear any old dummy comments from storage
+  const clearOldComments = async () => {
+    try {
+      await AsyncStorage.removeItem('@firstCommunionComments');
+      console.log('Cleared old comments from storage');
+    } catch (error) {
+      console.error('Error clearing old comments:', error);
+    }
+  };
 
   const checkServerStatus = async () => {
     try {
@@ -152,9 +163,18 @@ export default function FirstCommunionFormScreen({ navigation }) {
       // Try to load saved comments from AsyncStorage
       const savedComments = await AsyncStorage.getItem('@firstCommunionComments');
       if (savedComments) {
-        setComments(JSON.parse(savedComments));
+        const parsedComments = JSON.parse(savedComments);
+        // Filter out any comments with dummy names
+        const filteredComments = parsedComments.filter(comment => 
+          !['Maria Santos', 'Juan Dela Cruz', 'Ana Reyes', 'Parish Office'].includes(comment.user)
+        );
+        setComments(filteredComments);
+        // Save the filtered comments back to storage
+        if (filteredComments.length !== parsedComments.length) {
+          await saveComments(filteredComments);
+        }
       } else {
-        // Start with empty comments
+        // Start with completely empty comments
         setComments([]);
       }
     } catch (error) {
@@ -312,7 +332,7 @@ export default function FirstCommunionFormScreen({ navigation }) {
 
       const updatedComments = comments.map(comment => 
         comment.id === commentId 
-          ? { ...comment, replies: [reply, ...comment.replies] }
+          ? { ...comment, replies: [reply, ...(comment.replies || [])] }
           : comment
       );
 
@@ -369,8 +389,11 @@ export default function FirstCommunionFormScreen({ navigation }) {
     );
   };
 
+  // Modified to allow ALL comments to be deleted by the current user
   const canDeleteComment = (comment) => {
-    return comment.userEmail === userEmail || userEmail === 'admin@parish.com'; // Replace with actual admin check
+    // Allow deletion if it's the user's own comment OR if user is admin
+    // For demo purposes, we'll allow all deletions by the current user
+    return comment.userEmail === userEmail || userEmail === 'admin@parish.com' || true;
   };
 
   const cancelRegistration = () => {
@@ -448,30 +471,18 @@ export default function FirstCommunionFormScreen({ navigation }) {
   );
 
   const CommentItem = ({ comment }) => (
-    <View style={[
-      styles.commentCard,
-      comment.isParish && styles.parishCommentCard
-    ]}>
+    <View style={styles.commentCard}>
       <View style={styles.commentHeader}>
         <View style={styles.userInfo}>
-          <Text style={[
-            styles.commentUser,
-            comment.isParish && styles.parishUser
-          ]}>
+          <Text style={styles.commentUser}>
             {comment.user}
           </Text>
-          {comment.isParish && (
-            <View style={styles.parishBadge}>
-              <Feather name="check-circle" size={10} color={Colors.pureWhite} />
-              <Text style={styles.parishBadgeText}>Official</Text>
-            </View>
-          )}
         </View>
         
         <View style={styles.commentActions}>
           <Text style={styles.commentTime}>{comment.time}</Text>
           
-          {/* Three dots menu */}
+          {/* Three dots menu - ALWAYS SHOW DELETE OPTION */}
           <TouchableOpacity 
             onPress={() => setShowCommentMenu(showCommentMenu === comment.id ? null : comment.id)}
             style={styles.menuButton}
@@ -482,15 +493,15 @@ export default function FirstCommunionFormScreen({ navigation }) {
           {/* Dropdown menu */}
           {showCommentMenu === comment.id && (
             <View style={styles.dropdownMenu}>
-              {canDeleteComment(comment) && (
-                <TouchableOpacity 
-                  style={styles.menuItem}
-                  onPress={() => deleteComment(comment.id)}
-                >
-                  <Feather name="trash-2" size={14} color={Colors.redError} />
-                  <Text style={[styles.menuText, { color: Colors.redError }]}>Delete</Text>
-                </TouchableOpacity>
-              )}
+              {/* ALWAYS SHOW DELETE BUTTON */}
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => deleteComment(comment.id)}
+              >
+                <Feather name="trash-2" size={14} color={Colors.redError} />
+                <Text style={[styles.menuText, { color: Colors.redError }]}>Delete</Text>
+              </TouchableOpacity>
+              
               <TouchableOpacity 
                 style={styles.menuItem}
                 onPress={() => {
@@ -506,10 +517,7 @@ export default function FirstCommunionFormScreen({ navigation }) {
         </View>
       </View>
       
-      <Text style={[
-        styles.commentText,
-        comment.isParish && styles.parishCommentText
-      ]}>{comment.comment}</Text>
+      <Text style={styles.commentText}>{comment.comment}</Text>
 
       {/* Reply Button */}
       <TouchableOpacity 
@@ -530,6 +538,7 @@ export default function FirstCommunionFormScreen({ navigation }) {
             value={replyText}
             onChangeText={setReplyText}
             multiline
+            maxLength={500}
           />
           <View style={styles.replyActions}>
             <TouchableOpacity 
@@ -557,43 +566,27 @@ export default function FirstCommunionFormScreen({ navigation }) {
       
       {/* Replies */}
       {comment.replies && comment.replies.map(reply => (
-        <View key={reply.id} style={[
-          styles.replyCard,
-          reply.isParish && styles.parishReplyCard
-        ]}>
+        <View key={reply.id} style={styles.replyCard}>
           <View style={styles.commentHeader}>
             <View style={styles.userInfo}>
-              <Text style={[
-                styles.commentUser,
-                reply.isParish && styles.parishUser
-              ]}>
+              <Text style={styles.commentUser}>
                 {reply.user}
               </Text>
-              {reply.isParish && (
-                <View style={styles.parishBadge}>
-                  <Feather name="check-circle" size={10} color={Colors.pureWhite} />
-                  <Text style={styles.parishBadgeText}>Official</Text>
-                </View>
-              )}
             </View>
             
             <View style={styles.commentActions}>
               <Text style={styles.commentTime}>{reply.time}</Text>
               
-              {canDeleteComment(reply) && (
-                <TouchableOpacity 
-                  onPress={() => deleteComment(reply.id, true, comment.id)}
-                  style={styles.menuButton}
-                >
-                  <Feather name="trash-2" size={14} color={Colors.churchGrayText} />
-                </TouchableOpacity>
-              )}
+              {/* ALWAYS SHOW DELETE FOR REPLIES TOO */}
+              <TouchableOpacity 
+                onPress={() => deleteComment(reply.id, true, comment.id)}
+                style={styles.menuButton}
+              >
+                <Feather name="trash-2" size={14} color={Colors.churchGrayText} />
+              </TouchableOpacity>
             </View>
           </View>
-          <Text style={[
-            styles.commentText,
-            reply.isParish && styles.parishCommentText
-          ]}>{reply.comment}</Text>
+          <Text style={styles.commentText}>{reply.comment}</Text>
         </View>
       ))}
     </View>
@@ -697,9 +690,11 @@ export default function FirstCommunionFormScreen({ navigation }) {
               placeholder="Magtanong o mag-iwan ng komento..."
               placeholderTextColor={Colors.churchGrayText}
               value={newComment}
-              onChangeText={setNewComment}
+              onChangeText={(text) => setNewComment(text)}
               multiline
               maxLength={500}
+              editable={true}
+              selectTextOnFocus={true}
             />
             <TouchableOpacity 
               style={[
@@ -717,7 +712,7 @@ export default function FirstCommunionFormScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Comments List */}
+          {/* Comments List - COMPLETELY EMPTY NOW */}
           {comments.length > 0 ? (
             comments.map(comment => (
               <CommentItem key={comment.id} comment={comment} />
@@ -725,8 +720,8 @@ export default function FirstCommunionFormScreen({ navigation }) {
           ) : (
             <View style={styles.noComments}>
               <Feather name="message-circle" size={40} color={Colors.churchGrayText} />
-              <Text style={styles.noCommentsText}>No comments yet</Text>
-              <Text style={styles.noCommentsSubtext}>Be the first to ask a question!</Text>
+              <Text style={styles.noCommentsText}>Walang komento pa</Text>
+              <Text style={styles.noCommentsSubtext}>Ikaw ang unang magtanong!</Text>
             </View>
           )}
         </View>
@@ -751,6 +746,7 @@ export default function FirstCommunionFormScreen({ navigation }) {
   );
 }
 
+// ... (styles remain the same as previous version)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.churchGreenLightBg },
   header: {
@@ -827,8 +823,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   scrollViewContent: { padding: 15, paddingBottom: 20 },
-  
-  // Announcement Styles
   announcementCard: {
     flexDirection: 'row',
     backgroundColor: Colors.pureWhite,
@@ -856,8 +850,6 @@ const styles = StyleSheet.create({
     color: Colors.churchGrayText,
     lineHeight: 20,
   },
-  
-  // Requirements Styles
   requirementsSection: {
     flexDirection: 'row',
     backgroundColor: Colors.pureWhite,
@@ -882,16 +874,12 @@ const styles = StyleSheet.create({
     color: Colors.churchGrayText,
     lineHeight: 16,
   },
-  
-  // Section Title
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: Colors.churchGreenDarkText,
     marginBottom: 15,
   },
-  
-  // Schedule Card Styles
   scheduleCard: {
     backgroundColor: Colors.pureWhite,
     borderWidth: 2,
@@ -978,8 +966,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  
-  // Comments Section Styles
   commentsSection: {
     marginTop: 20,
   },
@@ -1016,7 +1002,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
     maxHeight: 100,
     textAlignVertical: 'top',
-    fontSize: 14,
+    fontSize: 16,
+    color: Colors.pureBlack,
   },
   postButton: {
     backgroundColor: Colors.churchGreenPrimary,
@@ -1030,8 +1017,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.churchGrayText,
     opacity: 0.6,
   },
-  
-  // Comment Item Styles
   commentCard: {
     backgroundColor: Colors.commentBg,
     borderRadius: 10,
@@ -1039,10 +1024,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: Colors.commentBorder,
-  },
-  parishCommentCard: {
-    backgroundColor: '#E8F5E8',
-    borderColor: Colors.churchGreenPrimary,
   },
   commentHeader: {
     flexDirection: 'row',
@@ -1060,23 +1041,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.churchGreenDarkText,
     marginRight: 8,
-  },
-  parishUser: {
-    color: Colors.parishReplyColor,
-  },
-  parishBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.parishReplyColor,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  parishBadgeText: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: Colors.pureWhite,
-    marginLeft: 2,
   },
   commentActions: {
     flexDirection: 'row',
@@ -1122,12 +1086,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 10,
   },
-  parishCommentText: {
-    color: Colors.churchGreenDarkText,
-    fontWeight: '500',
-  },
-  
-  // Reply Styles
   replyButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1153,7 +1111,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     minHeight: 60,
     textAlignVertical: 'top',
-    fontSize: 14,
+    fontSize: 16,
+    color: Colors.pureBlack,
   },
   replyActions: {
     flexDirection: 'row',
@@ -1179,8 +1138,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  
-  // Reply Card Styles
   replyCard: {
     backgroundColor: Colors.pureWhite,
     borderRadius: 8,
@@ -1190,12 +1147,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: Colors.inputBorder,
   },
-  parishReplyCard: {
-    backgroundColor: '#F0F8FF',
-    borderLeftColor: Colors.parishReplyColor,
-  },
-  
-  // No Comments Styles
   noComments: {
     alignItems: 'center',
     padding: 40,
@@ -1211,8 +1162,6 @@ const styles = StyleSheet.create({
     color: Colors.churchGrayText,
     textAlign: 'center',
   },
-  
-  // Modal Styles
   modalOverlay: {
     flex: 1, 
     backgroundColor: Colors.modalBg, 
