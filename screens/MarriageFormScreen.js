@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
     Image, Platform, Alert, Dimensions, ActivityIndicator, Modal,
@@ -6,6 +6,7 @@ import {
 import { Feather, AntDesign } from '@expo/vector-icons';
 import SignatureCanvas from 'react-native-signature-canvas';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -16,14 +17,19 @@ const C = {
     inputBg: '#FAFAFA', inputBorder: '#E0E0E0', shadow: '#000',
     redError: '#D32F2F', headerBg: '#FFFFFF', headerText: '#212121',
     modalBg: 'rgba(0,0,0,0.6)', cancelBtn: '#F0F0F0', cancelBtnTxt: '#424242',
-    successGreen: '#4CAF50',
+    successGreen: '#4CAF50', warningOrange: '#FF9800',
 };
 
+const API_BASE_URL = 'http://10.173.231.17:5000'; // Your server IP
+
 // Main MarriageForm Component
-export default function MarriageForm({ navigation }) {
+export default function MarriageForm({ navigation, route }) {
+    const { userEmail } = route.params || {}; // Get user email from navigation
+    
     const groomSignatureRef = useRef(null);
     const brideSignatureRef = useRef(null);
     const [step, setStep] = useState(1);
+    const [currentUserEmail, setCurrentUserEmail] = useState('');
     const [form, setForm] = useState({
         dateOfWedding: '', timeOfWedding: '', reservationFee: '', balance: '',
         groomName: '', groomMiddleName: '', groomSurname: '', groomDOB: '', groomAge: '', groomPOB: '', groomResidence: '', groomFatherName: '', groomMotherMaidenName: '',
@@ -35,6 +41,7 @@ export default function MarriageForm({ navigation }) {
         notes: '',
         groomSignature: null, brideSignature: null,
         dateOfApplication: new Date().toLocaleDateString(), groomCP: '', brideCP: '',
+        submittedByEmail: '', // Will be set dynamically
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,9 +52,145 @@ export default function MarriageForm({ navigation }) {
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [pickerField, setPickerField] = useState(null);
     const [submissionStatus, setSubmissionStatus] = useState({
-        status: null, // 'loading', 'success', 'error'
+        status: null,
         message: '',
     });
+    const [dateAvailability, setDateAvailability] = useState({
+        checking: false,
+        available: null,
+        message: ''
+    });
+    const [bookedDates, setBookedDates] = useState([]);
+
+  // Get user email from AsyncStorage on component mount
+useEffect(() => {
+    const getUserEmail = async () => {
+        try {
+            console.log('🔍 DEBUG - Starting to get user email...');
+            
+            // Try ALL possible storage keys that might contain user data
+            const keys = await AsyncStorage.getAllKeys();
+            console.log('🔍 DEBUG - All AsyncStorage keys:', keys);
+            
+            // Get all stored data
+            const allData = await AsyncStorage.multiGet(keys);
+            console.log('🔍 DEBUG - All AsyncStorage data:');
+            allData.forEach(([key, value]) => {
+                console.log(`  ${key}:`, value);
+            });
+
+            let email = '';
+
+            // Priority: route params -> userData -> user -> userEmail -> userInfo
+            if (userEmail) {
+                email = userEmail;
+                console.log('🔍 DEBUG - Using email from route params:', email);
+            } else {
+                // Try to find email in any of the stored data
+                for (const [key, value] of allData) {
+                    if (value) {
+                        try {
+                            const parsed = JSON.parse(value);
+                            if (parsed.email) {
+                                email = parsed.email;
+                                console.log('🔍 DEBUG - Found email in', key, ':', email);
+                                break;
+                            }
+                        } catch (e) {
+                            // If it's not JSON, check if it's directly an email
+                            if (key.toLowerCase().includes('email') && value.includes('@')) {
+                                email = value;
+                                console.log('🔍 DEBUG - Found email in', key, ':', email);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            console.log('🔍 DEBUG - Final email found:', email);
+            
+            if (email) {
+                setCurrentUserEmail(email);
+                setForm(prev => ({ ...prev, submittedByEmail: email }));
+                console.log('✅ DEBUG - Email set in form:', email);
+            } else {
+                console.warn('❌ DEBUG - No user email found! Showing manual input.');
+                // Don't show alert, just let the manual input appear
+            }
+        } catch (error) {
+            console.error('❌ DEBUG - Error getting user email:', error);
+        }
+    };
+
+    getUserEmail();
+}, [userEmail, navigation]);
+    // Fetch booked dates on component mount
+    useEffect(() => {
+        fetchBookedDates();
+    }, []);
+
+    // Check date availability when date changes
+    useEffect(() => {
+        if (form.dateOfWedding) {
+            checkDateAvailability(form.dateOfWedding, form.timeOfWedding);
+        }
+    }, [form.dateOfWedding, form.timeOfWedding]);
+
+    const fetchBookedDates = async () => {
+        try {
+            console.log('🔍 DEBUG - Fetching booked dates...');
+            const response = await fetch(`${API_BASE_URL}/api/booked-wedding-dates`);
+            if (response.ok) {
+                const dates = await response.json();
+                setBookedDates(dates);
+                console.log('✅ DEBUG - Booked dates fetched:', dates.length);
+            } else {
+                console.error('❌ DEBUG - Failed to fetch booked dates');
+            }
+        } catch (error) {
+            console.error('❌ DEBUG - Error fetching booked dates:', error);
+        }
+    };
+
+    const checkDateAvailability = async (date, time) => {
+        if (!date) return;
+        
+        setDateAvailability({ checking: true, available: null, message: '' });
+        
+        try {
+            console.log('🔍 DEBUG - Checking date availability:', date, time);
+            const response = await fetch(
+                `${API_BASE_URL}/api/check-wedding-availability?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time || '')}`
+            );
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ DEBUG - Availability result:', result);
+                setDateAvailability({
+                    checking: false,
+                    available: result.available,
+                    message: result.available 
+                        ? 'This date is available!' 
+                        : `Date already booked for ${result.existingBooking?.groomName} & ${result.existingBooking?.brideName}`
+                });
+            } else {
+                console.error('❌ DEBUG - Availability check failed');
+                setDateAvailability({
+                    checking: false,
+                    available: null,
+                    message: 'Error checking availability'
+                });
+            }
+        } catch (error) {
+            console.error('❌ DEBUG - Error checking availability:', error);
+            setDateAvailability({
+                checking: false,
+                available: null,
+                message: 'Network error checking availability'
+            });
+        }
+    };
 
     const handleChange = useCallback((field, value) => {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -56,7 +199,12 @@ export default function MarriageForm({ navigation }) {
     const onDateChange = (event, selectedDate) => {
         setShowDatePicker(false);
         if (selectedDate) {
-            handleChange(pickerField, selectedDate.toLocaleDateString());
+            const formattedDate = selectedDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            handleChange(pickerField, formattedDate);
         }
     };
 
@@ -97,13 +245,40 @@ export default function MarriageForm({ navigation }) {
     const validateAndNext = () => {
         let requiredFields = {};
         if (step === 1) {
-            requiredFields = { dateOfWedding: 'Wedding Date', timeOfWedding: 'Wedding Time', reservationFee: 'Reservation Fee' };
+            requiredFields = { 
+                dateOfWedding: 'Wedding Date', 
+                timeOfWedding: 'Wedding Time', 
+                reservationFee: 'Reservation Fee' 
+            };
+            
+            // Check date availability before proceeding
+            if (form.dateOfWedding && dateAvailability.available === false) {
+                Alert.alert(
+                    'Date Not Available',
+                    'The selected wedding date is already booked. Please choose another date.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
         } else if (step === 2) {
-            requiredFields = { groomName: 'Groom\'s Name', groomSurname: 'Groom\'s Surname', groomDOB: 'Groom\'s Date of Birth', groomResidence: 'Groom\'s Residence' };
+            requiredFields = { 
+                groomName: 'Groom\'s Name', 
+                groomSurname: 'Groom\'s Surname', 
+                groomDOB: 'Groom\'s Date of Birth', 
+                groomResidence: 'Groom\'s Residence' 
+            };
         } else if (step === 3) {
-            requiredFields = { brideName: 'Bride\'s Name', brideSurname: 'Bride\'s Surname', brideDOB: 'Bride\'s Date of Birth', brideResidence: 'Bride\'s Residence' };
+            requiredFields = { 
+                brideName: 'Bride\'s Name', 
+                brideSurname: 'Bride\'s Surname', 
+                brideDOB: 'Bride\'s Date of Birth', 
+                brideResidence: 'Bride\'s Residence' 
+            };
         } else if (step === 6) {
-            requiredFields = { groomCP: 'Groom\'s Contact Number', brideCP: 'Bride\'s Contact Number' };
+            requiredFields = { 
+                groomCP: 'Groom\'s Contact Number', 
+                brideCP: 'Bride\'s Contact Number' 
+            };
         }
 
         for (const field in requiredFields) {
@@ -116,44 +291,181 @@ export default function MarriageForm({ navigation }) {
     };
 
     const handleSubmit = () => {
+        console.log('🔍 DEBUG - Submit clicked:');
+        console.log('  - groomCP:', form.groomCP);
+        console.log('  - brideCP:', form.brideCP);
+        console.log('  - submittedByEmail:', form.submittedByEmail);
+        console.log('  - currentUserEmail:', currentUserEmail);
+
         if (!form.groomCP || !form.brideCP) {
             Alert.alert('Missing Info', 'Please provide both Groom\'s and Bride\'s contact numbers.');
             return;
         }
+        
+        // Use currentUserEmail as fallback
+        const finalEmail = form.submittedByEmail || currentUserEmail;
+        
+        if (!finalEmail) {
+            Alert.alert(
+                'Authentication Required', 
+                'Please log in to submit the application.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+        
         // Show the review modal before submitting
         setShowModal(true);
     };
 
-    // New: Handle the actual submission process
+    // Updated: Handle the actual submission to your server
     const confirmSubmit = async () => {
         setIsSubmitting(true);
         setSubmissionStatus({ status: 'loading', message: 'Submitting your application...' });
         
         try {
-            // Simulate API call or data processing
-            await new Promise(r => setTimeout(r, 2000));
-            // Simulating a successful submission
-            setIsSubmitting(false);
-            setSubmissionStatus({ status: 'success', message: 'Your application has been successfully submitted!' });
+            // Use currentUserEmail as fallback if submittedByEmail is empty
+            const finalEmail = form.submittedByEmail || currentUserEmail;
             
-            // Wait a bit, then close modal and navigate back
-            setTimeout(() => {
-                setShowModal(false);
-                navigation.goBack(); // Or navigate to a success screen
-            }, 1500);
+            if (!finalEmail) {
+                throw new Error('No user email available. Please log in again.');
+            }
 
-        } catch (e) {
-            // Handle submission failure
+            // Prepare the data for submission
+            const submissionData = {
+                ...form,
+                submittedByEmail: finalEmail
+            };
+
+            console.log('🔍 DEBUG - Final submission data:', {
+                submittedByEmail: submissionData.submittedByEmail,
+                groomName: submissionData.groomName,
+                brideName: submissionData.brideName,
+                dateOfWedding: submissionData.dateOfWedding
+            });
+
+            const response = await fetch(`${API_BASE_URL}/api/marriage_requests`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(submissionData),
+            });
+
+            const result = await response.json();
+
+            console.log('🔍 DEBUG - Server response:', result);
+
+            if (response.ok) {
+                setIsSubmitting(false);
+                setSubmissionStatus({ 
+                    status: 'success', 
+                    message: 'Your marriage application has been successfully submitted!' 
+                });
+                
+                setTimeout(() => {
+                    setShowModal(false);
+                    navigation.goBack();
+                }, 2000);
+            } else {
+                throw new Error(result.message || 'Submission failed');
+            }
+
+        } catch (error) {
+            console.error('❌ DEBUG - Submission failed:', error);
             setIsSubmitting(false);
-            setSubmissionStatus({ status: 'error', message: 'An error occurred. Please try again.' });
-            console.error('Submission failed:', e);
+            setSubmissionStatus({ 
+                status: 'error', 
+                message: error.message || 'An error occurred. Please try again.' 
+            });
+            
+            if (error.message.includes('already booked')) {
+                Alert.alert(
+                    'Date Not Available',
+                    error.message,
+                    [
+                        { 
+                            text: 'Change Date', 
+                            onPress: () => {
+                                setSubmissionStatus({ status: null, message: '' });
+                                setStep(1);
+                            }
+                        },
+                        { text: 'OK' }
+                    ]
+                );
+            }
         }
     };
-    
-    // New: Function to close the status modal and reset state
+
+    // Function to close the status modal and reset state
     const closeStatusModal = () => {
         setSubmissionStatus({ status: null, message: '' });
         setIsSubmitting(false);
+    };
+
+    // Render date availability status
+    const renderDateAvailability = () => {
+        if (!form.dateOfWedding) return null;
+
+        if (dateAvailability.checking) {
+            return (
+                <View style={ms.availabilityContainer}>
+                    <ActivityIndicator size="small" color={C.primary} />
+                    <Text style={[ms.availabilityText, { color: C.grayText }]}>
+                        Checking availability...
+                    </Text>
+                </View>
+            );
+        }
+
+        if (dateAvailability.available !== null) {
+            const isAvailable = dateAvailability.available;
+            return (
+                <View style={[
+                    ms.availabilityContainer, 
+                    { backgroundColor: isAvailable ? '#E8F5E9' : '#FFEBEE' }
+                ]}>
+                    <Feather 
+                        name={isAvailable ? "check-circle" : "x-circle"} 
+                        size={16} 
+                        color={isAvailable ? C.successGreen : C.redError} 
+                    />
+                    <Text style={[
+                        ms.availabilityText, 
+                        { color: isAvailable ? C.successGreen : C.redError }
+                    ]}>
+                        {dateAvailability.message}
+                    </Text>
+                </View>
+            );
+        }
+
+        return null;
+    };
+
+    // Add manual email input for testing if no email is found
+    const renderManualEmailInput = () => {
+        if (!form.submittedByEmail && !currentUserEmail) {
+            return (
+                <View style={ms.inputGroup}>
+                    <Text style={[ms.label, { color: C.darkText }]}>Your Email *</Text>
+                    <TextInput
+                        style={[ms.inputField, { color: C.darkText }]}
+                        placeholder="Enter your email address"
+                        placeholderTextColor={C.grayText}
+                        value={form.submittedByEmail}
+                        onChangeText={v => handleChange('submittedByEmail', v)}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
+                    <Text style={[ms.subText, { color: C.redError }]}>
+                        Email is required to submit the application
+                    </Text>
+                </View>
+            );
+        }
+        return null;
     };
 
     const renderHeader = () => (
@@ -211,6 +523,9 @@ export default function MarriageForm({ navigation }) {
         switch (step) {
             case 1:
                 return renderSectionCard('Step 1 of 6: Marriage Arrangement', <>
+                    {/* Manual email input for testing */}
+                    {renderManualEmailInput()}
+                    
                     <View style={ms.row}>
                         <View style={ms.flexItem}>
                             {renderInput('DATE OF WEDDING', 'e.g. Sept 20, 2025', form.dateOfWedding, v => handleChange('dateOfWedding', v), 'default', 'calendar', 'none', false, true, () => {
@@ -225,6 +540,10 @@ export default function MarriageForm({ navigation }) {
                             })}
                         </View>
                     </View>
+                    
+                    {/* Date Availability Status */}
+                    {renderDateAvailability()}
+                    
                     <View style={ms.row}>
                         <View style={ms.flexItem}>
                             {renderInput('RESERVATION FEE', 'e.g. ₱5,000', form.reservationFee, v => handleChange('reservationFee', v), 'numeric', 'dollar-sign', 'none', false, true)}
@@ -233,6 +552,21 @@ export default function MarriageForm({ navigation }) {
                             {renderInput('BALANCE', 'e.g. ₱2,000', form.balance, v => handleChange('balance', v), 'numeric', 'dollar-sign')}
                         </View>
                     </View>
+                    
+                    {/* Booked Dates Info */}
+                    {bookedDates.length > 0 && (
+                        <View style={ms.bookedDatesContainer}>
+                            <Text style={ms.bookedDatesTitle}>Upcoming Weddings:</Text>
+                            {bookedDates.slice(0, 3).map((booking, index) => (
+                                <Text key={index} style={ms.bookedDateText}>
+                                    {booking.dateOfWedding} - {booking.groomName} & {booking.brideName}
+                                </Text>
+                            ))}
+                            {bookedDates.length > 3 && (
+                                <Text style={ms.moreDatesText}>...and {bookedDates.length - 3} more</Text>
+                            )}
+                        </View>
+                    )}
                 </>);
             case 2:
                 return renderSectionCard('Step 2 of 6: Groom\'s Information', <>
@@ -513,6 +847,27 @@ export default function MarriageForm({ navigation }) {
                             <DetailRow label="Time of Wedding" value={form.timeOfWedding} />
                             <DetailRow label="Reservation Fee" value={form.reservationFee} />
                             <DetailRow label="Balance" value={form.balance} />
+                            
+                            {/* Show availability status in confirmation */}
+                            {form.dateOfWedding && dateAvailability.available !== null && (
+                                <View style={[
+                                    ms.availabilityBadge,
+                                    { backgroundColor: dateAvailability.available ? '#E8F5E9' : '#FFEBEE' }
+                                ]}>
+                                    <Feather 
+                                        name={dateAvailability.available ? "check-circle" : "x-circle"} 
+                                        size={16} 
+                                        color={dateAvailability.available ? C.successGreen : C.redError} 
+                                    />
+                                    <Text style={[
+                                        ms.availabilityBadgeText,
+                                        { color: dateAvailability.available ? C.successGreen : C.redError }
+                                    ]}>
+                                        {dateAvailability.available ? 'Date Available' : 'Date Already Booked'}
+                                    </Text>
+                                </View>
+                            )}
+                            
                             <Text style={ms.modalSectionTitle}>GROOM'S INFORMATION</Text>
                             <DetailRow label="Name" value={`${form.groomName} ${form.groomMiddleName} ${form.groomSurname}`} />
                             <DetailRow label="Date of Birth" value={form.groomDOB} />
@@ -534,13 +889,34 @@ export default function MarriageForm({ navigation }) {
                             <DetailRow label="Groom's CP#" value={form.groomCP} />
                             <DetailRow label="Bride's Signature" value={form.brideSignature} />
                             <DetailRow label="Bride's CP#" value={form.brideCP} />
+                            <Text style={ms.modalSectionTitle}>SUBMITTED BY</Text>
+                            <DetailRow label="User Email" value={form.submittedByEmail || currentUserEmail} />
                         </ScrollView>
                         <View style={ms.modalActions}>
                             <TouchableOpacity onPress={() => setShowModal(false)} disabled={isSubmitting} activeOpacity={0.7} style={[ms.modalButton, { backgroundColor: C.cancelBtn }]}>
                                 <Text style={[ms.modalButtonText, { color: C.cancelBtnTxt }]}>Cancel</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={confirmSubmit} disabled={isSubmitting} activeOpacity={0.7} style={[ms.modalButton, { backgroundColor: C.primary }]}>
-                                {isSubmitting ? (<ActivityIndicator color={C.white} />) : (<Text style={[ms.modalButtonText, { color: C.white }]}>Submit</Text>)}
+                            <TouchableOpacity 
+                                onPress={confirmSubmit} 
+                                disabled={isSubmitting || (form.dateOfWedding && dateAvailability.available === false) || (!form.submittedByEmail && !currentUserEmail)}
+                                activeOpacity={0.7} 
+                                style={[
+                                    ms.modalButton, 
+                                    { 
+                                        backgroundColor: (isSubmitting || (form.dateOfWedding && dateAvailability.available === false) || (!form.submittedByEmail && !currentUserEmail)) 
+                                            ? '#CCCCCC' 
+                                            : C.primary 
+                                    }
+                                ]}
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator color={C.white} />
+                                ) : (
+                                    <Text style={[ms.modalButtonText, { color: C.white }]}>
+                                        {form.dateOfWedding && dateAvailability.available === false ? 'Date Booked' : 
+                                         (!form.submittedByEmail && !currentUserEmail) ? 'Email Required' : 'Submit'}
+                                    </Text>
+                                )}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -569,16 +945,16 @@ export default function MarriageForm({ navigation }) {
                 />
             )}
 
-            {/* New: Loading Modal */}
+            {/* Loading Modal */}
             <LoadingModal />
             
-            {/* New: Success Modal */}
+            {/* Success Modal */}
             <SuccessModal />
         </View>
     );
 }
 
-// Existing Styles
+// Updated Styles (same as before, no changes needed)
 const ms = StyleSheet.create({
     container: {
         flex: 1,
@@ -1022,5 +1398,55 @@ const ms = StyleSheet.create({
         color: C.white,
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    // New Styles for Availability Features
+    availabilityContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 8,
+        marginVertical: 5,
+    },
+    availabilityText: {
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    bookedDatesContainer: {
+        backgroundColor: '#FFF3E0',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: C.warningOrange,
+    },
+    bookedDatesTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: C.darkText,
+        marginBottom: 5,
+    },
+    bookedDateText: {
+        fontSize: 12,
+        color: C.grayText,
+        marginBottom: 2,
+    },
+    moreDatesText: {
+        fontSize: 11,
+        color: C.grayText,
+        fontStyle: 'italic',
+    },
+    availabilityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        borderRadius: 6,
+        alignSelf: 'flex-start',
+        marginVertical: 5,
+    },
+    availabilityBadgeText: {
+        marginLeft: 6,
+        fontSize: 14,
+        fontWeight: '500',
     },
 });

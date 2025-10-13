@@ -154,8 +154,6 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           const day = parseInt(parts[1], 10);
           const year = parseInt(parts[2], 10);
           date = new Date(year, month, day);
-          
-          console.log('📅 Parsed MM/DD/YYYY:', { month, day, year, result: date });
         } else {
           // Return the original string if it's already in readable format
           return dateString;
@@ -174,13 +172,12 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         date = new Date(dateString);
       }
       else {
-        console.log('📅 Returning original string:', dateString);
         return dateString; // Return as is if we can't parse it
       }
       
       if (isNaN(date.getTime())) {
         console.warn('❌ Invalid date:', dateString);
-        return dateString || 'Date not set'; // Return original if invalid
+        return dateString || 'Date not set';
       }
       
       const formatted = date.toLocaleDateString('en-US', { 
@@ -189,11 +186,10 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         day: 'numeric' 
       });
       
-      console.log('✅ Formatted date:', formatted);
       return formatted;
     } catch (error) {
       console.error('❌ Date formatting error:', error, dateString);
-      return dateString || 'Date not set'; // Return original string if error
+      return dateString || 'Date not set';
     }
   };
 
@@ -215,10 +211,12 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     }
   };
 
-  // Enhanced function to get sacrament-specific details - FIXED FOR FUNERAL
+  // ENHANCED function to get sacrament-specific details - COMPLETELY REWRITTEN
   const getSacramentDetails = (sacrament, data) => {
+    console.log(`🔍 Processing ${sacrament} data:`, data);
+
     const baseDetails = {
-      name: data.name || 'Not specified',
+      name: 'Not specified',
       date: 'Date not set',
       time: 'Time not set',
       details: `${sacrament} request`,
@@ -237,12 +235,19 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         return {
           ...baseDetails,
           name: data.name || 'Not specified',
-          date: formatDate(data.baptismDate || data.date),
-          time: formatTime(data.baptismTime || data.time),
+          date: formatDate(data.baptismDate || data.dateOfWedding || data.date),
+          time: formatTime(data.baptismTime || data.timeOfWedding || data.time),
           details: `Baptismal request for ${data.name}`,
           amount: data.fee || data.amount || '500',
           baptismType: data.baptismType || 'Common Baptism',
+          // Additional baptism details
+          birthDate: data.birthDate ? formatDate(data.birthDate) : 'Not specified',
+          fatherName: data.fatherName || 'Not specified',
+          motherName: data.motherName || 'Not specified',
+          godfather: data.godfather || 'Not specified',
+          godmother: data.godmother || 'Not specified',
         };
+      
       case 'Kumpil':
         return {
           ...baseDetails,
@@ -251,25 +256,45 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           time: formatTime(data.kumpilTime || data.time),
           details: `Confirmation request for ${data.confirmandName || data.name}`,
           amount: data.fee || data.amount || '300',
+          // Additional kumpil details
+          age: data.age || 'Not specified',
+          baptismDate: data.baptismDate ? formatDate(data.baptismDate) : 'Not specified',
+          baptismChurch: data.baptismChurch || 'Not specified',
+          godfatherName: data.godfatherName || 'Not specified',
+          godmotherName: data.godmotherName || 'Not specified',
         };
+      
       case 'Kasal':
         return {
           ...baseDetails,
           name: `${data.groomName || 'Groom'} & ${data.brideName || 'Bride'}`,
-          date: formatDate(data.marriageDate || data.date),
-          time: formatTime(data.marriageTime || data.time),
+          date: formatDate(data.dateOfWedding || data.marriageDate || data.date),
+          time: formatTime(data.timeOfWedding || data.marriageTime || data.time),
           details: `Marriage request`,
-          amount: data.fee || data.amount || '2000',
+          amount: data.reservationFee || data.fee || data.amount || '2000',
+          // Additional marriage details
+          groomName: data.groomName || 'Not specified',
+          brideName: data.brideName || 'Not specified',
+          groomAge: data.groomAge || 'Not specified',
+          brideAge: data.brideAge || 'Not specified',
+          interviewDate: data.interviewDate ? formatDate(data.interviewDate) : 'Not scheduled',
+          seminarDate: data.seminarDate ? formatDate(data.seminarDate) : 'Not scheduled',
+          balance: data.balance || '0',
         };
+      
       case 'Pamisa':
         return {
           ...baseDetails,
-          name: Array.isArray(data.names) ? data.names[0] : (data.names || 'Not specified'),
+          name: Array.isArray(data.names) ? data.names.join(', ') : (data.names || 'Not specified'),
           date: data.displayDate || formatDate(data.date) || 'Date not set',
           time: data.displayTime || formatTime(data.time) || 'Time not set',
           details: `Mass intention: ${data.intention || 'Not specified'}`,
           amount: data.donation || data.amount || '0',
+          // Additional pamisa details
+          intention: data.intention || 'Not specified',
+          massSponsor: data.massSponsor || 'Not specified',
         };
+      
       case 'Blessing':
         return {
           ...baseDetails,
@@ -278,7 +303,12 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           time: data.displayTime || formatTime(data.time) || 'Time not set',
           details: `Blessing for: ${data.blessingType || 'Not specified'}`,
           amount: data.donation || data.amount || '0',
+          // Additional blessing details
+          blessingType: data.blessingType || 'Not specified',
+          requestForDetails: data.requestForDetails || 'Not specified',
+          address: data.address || 'Not specified',
         };
+      
       case 'Holy Orders':
         return {
           ...baseDetails,
@@ -287,7 +317,11 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           time: 'To be scheduled',
           details: `Vocational calling application - ${data.name}`,
           amount: '0',
+          // Additional holy orders details
+          contactNumber: data.contactNumber || 'Not specified',
+          references: data.references || [],
         };
+      
       case 'First Communion':
         return {
           ...baseDetails,
@@ -296,19 +330,30 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           time: formatTime(data.communionTime || data.time),
           details: `First Communion request for ${data.childName || data.name}`,
           amount: data.fee || data.amount || '300',
+          // Additional first communion details
+          age: data.age || 'Not specified',
+          birthDate: data.birthDate ? formatDate(data.birthDate) : 'Not specified',
+          parentsName: data.parentsName || 'Not specified',
         };
-      case 'Funeral Service': // FIXED FOR FUNERAL SERVICE
+      
+      case 'Funeral Service':
         return {
           ...baseDetails,
           name: data.nameOfDeceased || 'Not specified',
-          date: data.scheduleDate || data.displayDate || 'Date not set', // Use scheduleDate directly
-          time: data.scheduleTime || data.displayTime || 'Time not set', // Use scheduleTime directly
+          date: formatDate(data.scheduleDate || data.date) || 'Date not set',
+          time: formatTime(data.scheduleTime || data.time) || 'Time not set',
           details: `Funeral service for ${data.nameOfDeceased || 'deceased'}`,
           amount: data.donation || data.amount || '0',
+          // Additional funeral details
           causeOfDeath: data.causeOfDeath || '',
           placeOfBurial: data.placeOfBurialCemetery || '',
           informant: data.informant || '',
+          relationship: data.relationship || '',
+          age: data.age || '',
+          birthday: data.birthday ? formatDate(data.birthday) : 'Not specified',
+          dateDied: data.dateDied ? formatDate(data.dateDied) : 'Not specified',
         };
+      
       default:
         return baseDetails;
     }
@@ -326,7 +371,6 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     const submittedBy = request.submittedByEmail || request.email;
     console.log(`🔍 Verifying ownership: ${submittedBy} vs ${userEmail}`);
     
-    // Check if the request belongs to the current user
     return submittedBy && submittedBy.toLowerCase() === userEmail.toLowerCase();
   };
 
@@ -355,8 +399,6 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 
       let allData = [];
       let successfulFetches = 0;
-      let totalRequestsFound = 0;
-      let userRequestsFound = 0;
 
       for (const endpoint of endpoints) {
         try {
@@ -367,7 +409,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
             headers: {
               'Content-Type': 'application/json',
             },
-            timeout: 10000, // 10 second timeout
+            timeout: 10000,
           });
           
           if (!response.ok) {
@@ -403,8 +445,6 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 
             allData = [...allData, ...formattedRequests];
             successfulFetches++;
-            totalRequestsFound += data.length;
-            userRequestsFound += userRequests.length;
             
             console.log(`✅ ${endpoint.type} user requests after filtering:`, formattedRequests.length);
           } else {
@@ -417,8 +457,6 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 
       console.log(`📊 REQUEST SUMMARY:`);
       console.log(`   ✅ Successful fetches: ${successfulFetches}/${endpoints.length}`);
-      console.log(`   📥 Total requests found: ${totalRequestsFound}`);
-      console.log(`   👤 User-specific requests: ${userRequestsFound}`);
       console.log(`   🎯 Final user requests: ${allData.length}`);
 
       // Sort by date (newest first)
@@ -528,6 +566,104 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     }
   };
 
+  // ENHANCED function to render sacrament-specific details
+  const renderSacramentSpecificDetails = (item) => {
+    const details = [];
+
+    switch (item.sacrament) {
+      case 'Baptism':
+        if (item.baptismType) {
+          details.push(`Type: ${item.baptismType}`);
+        }
+        if (item.birthDate && item.birthDate !== 'Not specified') {
+          details.push(`Birth: ${item.birthDate}`);
+        }
+        if (item.fatherName && item.fatherName !== 'Not specified') {
+          details.push(`Father: ${item.fatherName}`);
+        }
+        if (item.motherName && item.motherName !== 'Not specified') {
+          details.push(`Mother: ${item.motherName}`);
+        }
+        break;
+      
+      case 'Kumpil':
+        if (item.age && item.age !== 'Not specified') {
+          details.push(`Age: ${item.age}`);
+        }
+        if (item.baptismDate && item.baptismDate !== 'Not specified') {
+          details.push(`Baptized: ${item.baptismDate}`);
+        }
+        if (item.godfatherName && item.godfatherName !== 'Not specified') {
+          details.push(`Godfather: ${item.godfatherName}`);
+        }
+        break;
+      
+      case 'Kasal':
+        if (item.groomName && item.groomName !== 'Not specified') {
+          details.push(`Groom: ${item.groomName}`);
+        }
+        if (item.brideName && item.brideName !== 'Not specified') {
+          details.push(`Bride: ${item.brideName}`);
+        }
+        if (item.interviewDate && item.interviewDate !== 'Not scheduled') {
+          details.push(`Interview: ${item.interviewDate}`);
+        }
+        if (item.balance && item.balance !== '0') {
+          details.push(`Balance: ₱${item.balance}`);
+        }
+        break;
+      
+      case 'Pamisa':
+        if (item.intention && item.intention !== 'Not specified') {
+          details.push(`Intention: ${item.intention}`);
+        }
+        if (item.massSponsor && item.massSponsor !== 'Not specified') {
+          details.push(`Sponsor: ${item.massSponsor}`);
+        }
+        break;
+      
+      case 'Blessing':
+        if (item.blessingType && item.blessingType !== 'Not specified') {
+          details.push(`Type: ${item.blessingType}`);
+        }
+        if (item.requestForDetails && item.requestForDetails !== 'Not specified') {
+          details.push(`For: ${item.requestForDetails}`);
+        }
+        break;
+      
+      case 'Funeral Service':
+        if (item.causeOfDeath) {
+          details.push(`Cause: ${item.causeOfDeath}`);
+        }
+        if (item.placeOfBurial) {
+          details.push(`Burial: ${item.placeOfBurial}`);
+        }
+        if (item.informant) {
+          details.push(`Informant: ${item.informant}`);
+        }
+        if (item.age) {
+          details.push(`Age: ${item.age}`);
+        }
+        break;
+      
+      case 'First Communion':
+        if (item.age && item.age !== 'Not specified') {
+          details.push(`Age: ${item.age}`);
+        }
+        if (item.parentsName && item.parentsName !== 'Not specified') {
+          details.push(`Parents: ${item.parentsName}`);
+        }
+        break;
+    }
+
+    return details.map((detail, index) => (
+      <View key={index} style={styles.specificDetailRow}>
+        <Ionicons name="ellipse" size={8} color="#6b7280" style={styles.detailIcon} />
+        <Text style={styles.specificDetailText}>{detail}</Text>
+      </View>
+    ));
+  };
+
   const renderItemCard = (item, index) => {
     const isHolyOrders = item.sacrament === 'Holy Orders';
     const isFuneralService = item.sacrament === 'Funeral Service';
@@ -558,6 +694,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           <StatusBadge status={item.status} paymentStatus={item.paymentStatus} />
         </View>
 
+        {/* Schedule Information */}
         <View style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={16} color="#6b7280" style={styles.detailIcon} />
           <Text style={styles.detailText}>
@@ -565,25 +702,10 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
-        {/* FUNERAL SPECIFIC DETAILS */}
-        {isFuneralService && item.causeOfDeath && (
-          <View style={styles.detailRow}>
-            <Ionicons name="warning-outline" size={16} color="#6b7280" style={styles.detailIcon} />
-            <Text style={styles.detailText}>
-              Cause: {item.causeOfDeath}
-            </Text>
-          </View>
-        )}
+        {/* Sacrament Specific Details */}
+        {renderSacramentSpecificDetails(item)}
 
-        {isFuneralService && item.placeOfBurial && (
-          <View style={styles.detailRow}>
-            <Ionicons name="location-outline" size={16} color="#6b7280" style={styles.detailIcon} />
-            <Text style={styles.detailText}>
-              Burial: {item.placeOfBurial}
-            </Text>
-          </View>
-        )}
-
+        {/* Payment Information */}
         {item.amount !== '0' && item.amount !== '0' && (
           <View style={styles.detailRow}>
             <Ionicons name="cash-outline" size={16} color="#6b7280" style={styles.detailIcon} />
@@ -594,11 +716,13 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           </View>
         )}
 
+        {/* Request Details */}
         <View style={styles.detailRow}>
           <Ionicons name="information-circle-outline" size={16} color="#6b7280" style={styles.detailIcon} />
           <Text style={styles.detailText} numberOfLines={2}>{item.details}</Text>
         </View>
 
+        {/* Submission Date */}
         <View style={styles.detailRow}>
           <Ionicons name="time-outline" size={16} color="#6b7280" style={styles.detailIcon} />
           <Text style={styles.detailText}>Submitted: {item.submittedDate}</Text>
@@ -649,15 +773,6 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
             <Ionicons name="information-circle" size={16} color="#7e22ce" />
             <Text style={styles.specialNoteText}>
               Funeral service request. The parish will contact you for confirmation.
-            </Text>
-          </View>
-        )}
-
-        {/* Debug info - shows which user submitted this request */}
-        {__DEV__ && (
-          <View style={styles.debugInfo}>
-            <Text style={styles.debugText}>
-              Submitted by: {item.submittedBy || 'Unknown'}
             </Text>
           </View>
         )}
@@ -917,6 +1032,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-start", 
     marginTop: 6 
   },
+  specificDetailRow: {
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginTop: 4,
+    marginLeft: 8,
+  },
   detailIcon: { 
     marginRight: 8, 
     marginTop: 2 
@@ -927,6 +1048,13 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     flex: 1,
     lineHeight: 18,
+  },
+  specificDetailText: {
+    fontSize: 13, 
+    color: "#6b7280", 
+    fontWeight: "400",
+    flex: 1,
+    lineHeight: 16,
   },
   reasonButton: {
     flexDirection: 'row',
@@ -979,17 +1107,6 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     flex: 1,
     lineHeight: 16,
-    fontStyle: 'italic',
-  },
-  debugInfo: {
-    marginTop: 8,
-    padding: 4,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 4,
-  },
-  debugText: {
-    fontSize: 10,
-    color: '#6b7280',
     fontStyle: 'italic',
   },
   loadingContainer: {

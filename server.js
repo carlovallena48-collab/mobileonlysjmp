@@ -808,51 +808,199 @@ app.get("/api/kumpil_requests", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch Kumpil requests." });
   }
 });
+// =======================
+// MARRIAGE REQUEST ROUTES - UPDATED WITH AVAILABILITY CHECK
+// =======================
 
-// =======================
-// MARRIAGE REQUEST ROUTES
-// =======================
+// Check wedding date availability
+app.get("/api/check-wedding-availability", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const { date, time } = req.query;
+    
+    if (!date) {
+      return res.status(400).json({ message: "Date is required." });
+    }
+
+    // Check if date is already booked
+    const existingBooking = await db.collection("marriagerequests").findOne({
+      dateOfWedding: date,
+      status: { $in: ["pending", "approved"] }
+    });
+
+    const isAvailable = !existingBooking;
+    
+    res.status(200).json({
+      available: isAvailable,
+      date: date,
+      time: time,
+      existingBooking: isAvailable ? null : {
+        groomName: existingBooking.groomName,
+        brideName: existingBooking.brideName,
+        time: existingBooking.timeOfWedding
+      }
+    });
+  } catch (err) {
+    console.error("Check availability error:", err);
+    res.status(500).json({ message: "Failed to check availability." });
+  }
+});
+
+// Get all booked dates
+app.get("/api/booked-wedding-dates", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const bookedDates = await db.collection("marriagerequests")
+      .find({ 
+        status: { $in: ["pending", "approved"] },
+        dateOfWedding: { $exists: true, $ne: null }
+      })
+      .project({ 
+        dateOfWedding: 1, 
+        timeOfWedding: 1,
+        groomName: 1,
+        brideName: 1,
+        status: 1
+      })
+      .toArray();
+
+    res.status(200).json(bookedDates);
+  } catch (err) {
+    console.error("Fetch booked dates error:", err);
+    res.status(500).json({ message: "Failed to fetch booked dates." });
+  }
+});
+
+// Submit marriage request - UPDATED VERSION
 app.post("/api/marriage_requests", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database not connected yet." });
 
   try {
+    console.log('📥 Received Marriage request:', req.body);
+
+    // Basic validation
+    if (!req.body.dateOfWedding || !req.body.timeOfWedding || !req.body.groomName || !req.body.brideName) {
+      return res.status(400).json({ 
+        message: "Wedding date, time, groom name, and bride name are required." 
+      });
+    }
+
+    // Check if date is already booked
+    const existingBooking = await db.collection("marriagerequests").findOne({
+      dateOfWedding: req.body.dateOfWedding,
+      status: { $in: ["pending", "approved"] }
+    });
+
+    if (existingBooking) {
+      return res.status(409).json({ 
+        message: "This wedding date is already booked. Please choose another date.",
+        existingBooking: {
+          groomName: existingBooking.groomName,
+          brideName: existingBooking.brideName,
+          time: existingBooking.timeOfWedding
+        }
+      });
+    }
+
     const marriageData = {
-      sacrament: "Kasal",
+      // Marriage Arrangement
+      dateOfWedding: req.body.dateOfWedding,
+      timeOfWedding: req.body.timeOfWedding,
+      reservationFee: req.body.reservationFee || "",
+      balance: req.body.balance || "",
+      
+      // Groom's Information
       groomName: req.body.groomName,
+      groomMiddleName: req.body.groomMiddleName || "",
+      groomSurname: req.body.groomSurname,
+      groomDOB: req.body.groomDOB || "",
+      groomAge: req.body.groomAge || "",
+      groomPOB: req.body.groomPOB || "",
+      groomResidence: req.body.groomResidence,
+      groomFatherName: req.body.groomFatherName || "",
+      groomMotherMaidenName: req.body.groomMotherMaidenName || "",
+      groomCP: req.body.groomCP || "",
+      
+      // Bride's Information
       brideName: req.body.brideName,
-      marriageDate: req.body.marriageDate ? new Date(req.body.marriageDate) : null,
-      marriageTime: req.body.marriageTime || null, 
-      groomContact: req.body.groomContact || null,
-      brideContact: req.body.brideContact || null,
-      currentAddress: req.body.currentAddress || null,
-      requirements: req.body.requirements || [], 
+      brideMiddleName: req.body.brideMiddleName || "",
+      brideSurname: req.body.brideSurname,
+      brideDOB: req.body.brideDOB || "",
+      brideAge: req.body.brideAge || "",
+      bridePOB: req.body.bridePOB || "",
+      brideResidence: req.body.brideResidence,
+      brideFatherName: req.body.brideFatherName || "",
+      brideMotherMaidenName: req.body.brideMotherMaidenName || "",
+      brideCP: req.body.brideCP || "",
+      
+      // Requirements
+      groomMarriageLicense: req.body.groomMarriageLicense || "",
+      groomBaptismalCert: req.body.groomBaptismalCert || "",
+      groomConfirmationCert: req.body.groomConfirmationCert || "",
+      groomMarriageBannsPermission: req.body.groomMarriageBannsPermission || "",
+      brideMarriageLicense: req.body.brideMarriageLicense || "",
+      brideBaptismalCert: req.body.brideBaptismalCert || "",
+      brideConfirmationCert: req.body.brideConfirmationCert || "",
+      brideMarriageBannsPermission: req.body.brideMarriageBannsPermission || "",
+      
+      // Schedule
+      interviewDate: req.body.interviewDate || "",
+      interviewTime: req.body.interviewTime || "",
+      seminarDate: req.body.seminarDate || "",
+      seminarTime: req.body.seminarTime || "",
+      
+      // Sponsors
+      sponsors: req.body.sponsors || Array(20).fill(''),
+      
+      // Signatures
+      groomSignature: req.body.groomSignature || null,
+      brideSignature: req.body.brideSignature || null,
+      
+      // Metadata
+      sacrament: "Marriage",
       status: "pending",
-      submittedByEmail: req.body.submittedByEmail?.trim().toLowerCase() || "guest@example.com", 
+      submittedByEmail: req.body.submittedByEmail?.trim().toLowerCase(),
+      dateOfApplication: req.body.dateOfApplication || new Date().toLocaleDateString(),
       createdAt: new Date(),
+      requestNumber: `MARRIAGE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      lastUpdated: new Date()
     };
 
     const result = await db.collection("marriagerequests").insertOne(marriageData);
 
-    res.status(201).json({ message: "Marriage request saved!", id: result.insertedId });
+    console.log('✅ Marriage request saved:', marriageData.requestNumber);
+    console.log('👤 Submitted by:', marriageData.submittedByEmail);
+
+    res.status(201).json({ 
+      message: "Marriage application submitted successfully!", 
+      id: result.insertedId,
+      requestNumber: marriageData.requestNumber
+    });
   } catch (err) {
     console.error("Marriage request save error:", err);
-    res.status(500).json({ message: "Failed to save Marriage request." });
+    res.status(500).json({ message: "Failed to submit marriage application." });
   }
 });
 
-app.get("/api/marriage_requests", async (req, res) => {
+// Get marriage requests by user email
+app.get("/api/marriage_requests/:email", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database not connected yet." });
 
   try {
+    const { email } = req.params;
+    const userEmail = email.trim().toLowerCase();
+
     const requests = await db
       .collection("marriagerequests")
-      .find()
+      .find({ submittedByEmail: userEmail })
       .sort({ createdAt: -1 })
       .toArray();
 
     res.status(200).json(requests);
   } catch (err) {
-    console.error("Fetch Marriage requests error:", err);
+    console.error("Fetch user Marriage requests error:", err);
     res.status(500).json({ message: "Failed to fetch Marriage requests." });
   }
 });
@@ -1603,6 +1751,368 @@ app.get("/api/funeral_requests/:email", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch Funeral Service requests." });
   }
 });
+
+// =============================================
+// CERTIFICATE REQUEST ROUTES - MONGODB VERSION
+// =============================================
+
+// Create certificate_requests collection if not exists
+app.get('/api/init-certificate-collection', async (req, res) => {
+  try {
+    // Check if collection exists, if not it will be created automatically
+    const collections = await db.listCollections({ name: "certificaterequests" }).toArray();
+    
+    if (collections.length === 0) {
+      console.log('📁 Creating certificaterequests collection...');
+      await db.createCollection("certificaterequests");
+      
+      // Insert sample data
+      const sampleData = [
+        {
+          certificateType: "Baptismal Certificate",
+          fullName: "Maria Santos Cruz",
+          dateOfSacrament: "2010-05-15",
+          purpose: "School Requirements",
+          contactNumber: "09123456789",
+          address: "123 Main St, Manila",
+          requestedCopies: 2,
+          status: "Completed",
+          certificateNumber: "BAP-2024-00123",
+          requestDate: new Date().toISOString().split('T')[0],
+          scheduledDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          certificateType: "Marriage Certificate",
+          fullName: "Juan and Maria Dela Cruz",
+          dateOfSacrament: "2015-06-20",
+          purpose: "Legal Documentation",
+          contactNumber: "09123456790",
+          address: "456 Oak St, Quezon City",
+          requestedCopies: 1,
+          status: "In Progress",
+          certificateNumber: "MAR-2024-00045",
+          requestDate: new Date().toISOString().split('T')[0],
+          scheduledDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+      
+      await db.collection("certificaterequests").insertMany(sampleData);
+      console.log('✅ Sample certificate data inserted');
+    }
+    
+    res.json({ success: true, message: "Certificate collection initialized" });
+  } catch (error) {
+    console.error('Error initializing certificate collection:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Submit certificate request
+app.post('/api/certificate-requests', async (req, res) => {
+  try {
+    const {
+      certificateType,
+      fullName,
+      dateOfSacrament,
+      purpose,
+      contactNumber,
+      address,
+      requestedCopies = 1,
+      status = 'Pending',
+      submittedByEmail
+    } = req.body;
+
+    console.log('📥 Received certificate request:', req.body);
+
+    // Validation
+    if (!certificateType || !fullName || !purpose) {
+      return res.status(400).json({
+        success: false,
+        message: 'Certificate type, full name, and purpose are required'
+      });
+    }
+
+    // Generate certificate number
+    const prefixMap = {
+      'Baptismal Certificate': 'BAP',
+      'Marriage Certificate': 'MAR', 
+      'Confirmation Certificate': 'CON',
+      'Birth Certificate': 'BIR',
+      'Death Certificate': 'DTH',
+      'Kumpil Certificate': 'KMP',
+      'Kumpisal Certificate': 'KMS',
+      'Other Certificate': 'CER'
+    };
+    
+    const prefix = prefixMap[certificateType] || 'CER';
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const certificateNumber = `${prefix}-${new Date().getFullYear()}-${randomNum}`;
+
+    // Calculate scheduled date (5 days from now)
+    const scheduledDate = new Date();
+    scheduledDate.setDate(scheduledDate.getDate() + 5);
+
+    const certificateData = {
+      certificateType,
+      fullName,
+      dateOfSacrament: dateOfSacrament || null,
+      purpose,
+      contactNumber: contactNumber || '',
+      address: address || '',
+      requestedCopies: parseInt(requestedCopies) || 1,
+      status,
+      certificateNumber,
+      submittedByEmail: submittedByEmail || null,
+      requestDate: new Date().toISOString().split('T')[0],
+      scheduledDate: scheduledDate.toISOString().split('T')[0],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Insert into MongoDB
+    const result = await db.collection("certificaterequests").insertOne(certificateData);
+
+    console.log('✅ Certificate request saved:', certificateNumber);
+
+    res.status(201).json({
+      success: true,
+      message: 'Certificate request submitted successfully',
+      data: {
+        id: result.insertedId,
+        ...certificateData
+      }
+    });
+  } catch (error) {
+    console.error('Error submitting certificate request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error submitting certificate request: ' + error.message
+    });
+  }
+});
+
+// Get all certificate requests
+app.get('/api/certificate-requests', async (req, res) => {
+  try {
+    console.log('📋 Fetching all certificate requests');
+    
+    const requests = await db.collection("certificaterequests")
+      .find()
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    console.log(`✅ Found ${requests.length} certificate requests`);
+
+    res.json({
+      success: true,
+      data: requests
+    });
+  } catch (error) {
+    console.error('Error fetching certificate requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching certificate requests: ' + error.message
+    });
+  }
+});
+
+// Get certificate requests by user email
+app.get('/api/certificate-requests/user/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const userEmail = email.trim().toLowerCase();
+
+    console.log(`🔍 Fetching certificate requests for user: ${userEmail}`);
+
+    const requests = await db.collection("certificaterequests")
+      .find({ submittedByEmail: userEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    console.log(`✅ Found ${requests.length} certificate requests for ${userEmail}`);
+
+    res.json({
+      success: true,
+      data: requests
+    });
+  } catch (error) {
+    console.error('Error fetching user certificate requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching certificate requests: ' + error.message
+    });
+  }
+});
+
+// Get certificate request by ID
+app.get('/api/certificate-requests/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`🔍 Fetching certificate request: ${id}`);
+
+    const request = await db.collection("certificaterequests").findOne({
+      _id: new ObjectId(id)
+    });
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Certificate request not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: request
+    });
+  } catch (error) {
+    console.error('Error fetching certificate request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching certificate request: ' + error.message
+    });
+  }
+});
+
+// Update certificate request status
+app.put('/api/certificate-requests/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    const validStatuses = ['Pending', 'In Progress', 'Completed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status'
+      });
+    }
+
+    console.log(`🔄 Updating certificate status: ${id} to ${status}`);
+
+    const result = await db.collection("certificaterequests").updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          status: status,
+          updatedAt: new Date()
+        } 
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Certificate request not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Certificate request status updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating certificate request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating certificate request: ' + error.message
+    });
+  }
+});
+
+// Delete certificate request
+app.delete('/api/certificate-requests/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`🗑️ Deleting certificate request: ${id}`);
+
+    const result = await db.collection("certificaterequests").deleteOne({
+      _id: new ObjectId(id)
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Certificate request not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Certificate request deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting certificate request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting certificate request: ' + error.message
+    });
+  }
+});
+
+// Search certificate requests
+app.get('/api/certificate-requests/search/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+    
+    console.log(`🔍 Searching certificate requests: ${query}`);
+
+    const requests = await db.collection("certificaterequests").find({
+      $or: [
+        { certificateType: { $regex: query, $options: "i" } },
+        { fullName: { $regex: query, $options: "i" } },
+        { certificateNumber: { $regex: query, $options: "i" } },
+        { purpose: { $regex: query, $options: "i" } }
+      ]
+    }).sort({ createdAt: -1 }).toArray();
+
+    res.json({
+      success: true,
+      data: requests
+    });
+  } catch (error) {
+    console.error('Error searching certificate requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error searching certificate requests: ' + error.message
+    });
+  }
+});
+
+// Get certificate statistics
+app.get('/api/certificate-stats', async (req, res) => {
+  try {
+    const total = await db.collection("certificaterequests").countDocuments();
+    const pending = await db.collection("certificaterequests").countDocuments({ status: 'Pending' });
+    const inProgress = await db.collection("certificaterequests").countDocuments({ status: 'In Progress' });
+    const completed = await db.collection("certificaterequests").countDocuments({ status: 'Completed' });
+
+    const stats = {
+      total,
+      pending,
+      inProgress,
+      completed
+    };
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching certificate stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching certificate statistics: ' + error.message
+    });
+  }
+});
+
 // =======================
 // START SERVER
 // =======================

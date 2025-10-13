@@ -84,6 +84,9 @@ const DashboardScreen = ({ navigation }) => {
   // 🆕 NEW FUNCTION: Navigate to Request Certificate Screen
   const handleCertificatePress = () => navigation.navigate("RequestCertificate");
 
+  // 🆕 NEW FUNCTION: Navigate to View Request Certificate Screen
+  const handleViewCertificatePress = () => navigation.navigate("ViewRequestCertificate");
+
   const handleNavPress = (navItem) => {
     setActiveNav(navItem.route);
     if (navItem.route !== "Dashboard") navigation.navigate(navItem.route);
@@ -275,7 +278,7 @@ const DashboardScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* 🆕 UPDATED: TWO BUTTONS SECTION - History and Certificate */}
+          {/* 🆕 UPDATED: THREE BUTTONS SECTION - History, Request Certificate, and View Certificate */}
           <View style={styles.buttonsSection}>
             <View style={styles.buttonsRow}>
               {/* History Button */}
@@ -294,7 +297,7 @@ const DashboardScreen = ({ navigation }) => {
                 <Feather name="chevron-right" size={20} color={CARD_BACKGROUND} />
               </TouchableOpacity>
 
-              {/* Certificate Button */}
+              {/* Request Certificate Button */}
               <TouchableOpacity 
                 style={[styles.actionButton, styles.certificateButton]} 
                 onPress={handleCertificatePress} 
@@ -306,6 +309,24 @@ const DashboardScreen = ({ navigation }) => {
                 <View style={styles.buttonTextContainer}>
                   <Text style={styles.actionButtonText}>Request Certificate</Text>
                   <Text style={styles.actionButtonSubtext}>Get baptismal, marriage certificates</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={CARD_BACKGROUND} />
+              </TouchableOpacity>
+            </View>
+
+            {/* 🆕 NEW ROW: View Your Request Certificate Button */}
+            <View style={styles.singleButtonRow}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.viewCertificateButton]} 
+                onPress={handleViewCertificatePress} 
+                activeOpacity={0.8}
+              >
+                <View style={styles.buttonIconContainer}>
+                  <Ionicons name="eye-outline" size={24} color={CARD_BACKGROUND} />
+                </View>
+                <View style={styles.buttonTextContainer}>
+                  <Text style={styles.actionButtonText}>View Your Request Certificate</Text>
+                  <Text style={styles.actionButtonSubtext}>Check status of your certificate requests</Text>
                 </View>
                 <Feather name="chevron-right" size={20} color={CARD_BACKGROUND} />
               </TouchableOpacity>
@@ -523,7 +544,7 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
-  // 🆕 NEW STYLES FOR TWO BUTTONS SECTION
+  // 🆕 UPDATED STYLES FOR THREE BUTTONS SECTION
   buttonsSection: {
     marginBottom: 20,
   },
@@ -531,6 +552,11 @@ const styles = StyleSheet.create({
   buttonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  singleButtonRow: {
+    marginTop: 8,
   },
 
   actionButton: {
@@ -555,6 +581,11 @@ const styles = StyleSheet.create({
   certificateButton: {
     backgroundColor: '#7e22ce', // Dark Purple
     shadowColor: '#7e22ce',
+  },
+
+  viewCertificateButton: {
+    backgroundColor: '#059669', // Dark Green
+    shadowColor: '#059669',
   },
 
   buttonIconContainer: {
