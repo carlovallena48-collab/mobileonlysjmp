@@ -11,9 +11,12 @@ import {
   Alert,
   RefreshControl,
   Modal,
+  Dimensions
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width } = Dimensions.get('window');
 
 const PRIMARY_COLOR = "#047857";
 const SECONDARY_COLOR = "#34d399";
@@ -29,7 +32,7 @@ const StatusBadge = ({ status, paymentStatus }) => {
   let color = "#9ca3af";
   let text = status;
 
-  switch (status) {
+  switch (status?.toLowerCase()) {
     case "completed":
     case "approved":
       color = "#10b981";
@@ -44,6 +47,7 @@ const StatusBadge = ({ status, paymentStatus }) => {
       break;
     case "rejected":
     case "cancelled":
+    case "canceled":
       color = "#ef4444";
       break;
     default:
@@ -83,9 +87,11 @@ const ReasonModal = ({ visible, onClose, reason, type }) => (
         <Text style={styles.modalTitle}>
           {type === 'rejected' ? 'Rejection Reason' : 'Cancellation Reason'}
         </Text>
-        <Text style={styles.reasonText}>
-          {reason || 'No reason provided'}
-        </Text>
+        <ScrollView style={styles.reasonScroll}>
+          <Text style={styles.reasonText}>
+            {reason || 'No reason provided'}
+          </Text>
+        </ScrollView>
         <TouchableOpacity style={styles.modalCloseButton} onPress={onClose}>
           <Text style={styles.modalCloseText}>Close</Text>
         </TouchableOpacity>
@@ -120,40 +126,99 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         return 'person-add-outline';
       case 'First Communion':
         return 'wine-outline';
+      case 'Funeral Service':
+        return 'flower-outline';
       default:
         return 'calendar-outline';
     }
   };
 
-  // Function to format date from API
+  // IMPROVED function to format date from API - FIXED FOR ALL DATE FORMATS
   const formatDate = (dateString) => {
     if (!dateString) return 'Date not set';
     
     try {
       let date;
-      if (dateString.$date && dateString.$date.$numberLong) {
+      
+      console.log('📅 Formatting date:', dateString, 'Type:', typeof dateString);
+      
+      // Handle MongoDB date format
+      if (dateString?.$date?.$numberLong) {
         date = new Date(parseInt(dateString.$date.$numberLong, 10));
-      } else {
+      } 
+      // Handle string dates in MM/DD/YYYY format (from Funeral form)
+      else if (typeof dateString === 'string' && dateString.includes('/')) {
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          const month = parseInt(parts[0], 10) - 1; // Months are 0-indexed
+          const day = parseInt(parts[1], 10);
+          const year = parseInt(parts[2], 10);
+          date = new Date(year, month, day);
+          
+          console.log('📅 Parsed MM/DD/YYYY:', { month, day, year, result: date });
+        } else {
+          // Return the original string if it's already in readable format
+          return dateString;
+        }
+      }
+      // Handle ISO string dates
+      else if (typeof dateString === 'string') {
         date = new Date(dateString);
       }
+      // Handle Date objects
+      else if (dateString instanceof Date) {
+        date = dateString;
+      }
+      // Handle timestamp
+      else if (typeof dateString === 'number') {
+        date = new Date(dateString);
+      }
+      else {
+        console.log('📅 Returning original string:', dateString);
+        return dateString; // Return as is if we can't parse it
+      }
       
-      if (isNaN(date.getTime())) return 'Invalid date';
+      if (isNaN(date.getTime())) {
+        console.warn('❌ Invalid date:', dateString);
+        return dateString || 'Date not set'; // Return original if invalid
+      }
       
-      return date.toLocaleDateString('en-US', { 
+      const formatted = date.toLocaleDateString('en-US', { 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric' 
       });
+      
+      console.log('✅ Formatted date:', formatted);
+      return formatted;
     } catch (error) {
-      console.error('Date formatting error:', error);
-      return 'Date not set';
+      console.error('❌ Date formatting error:', error, dateString);
+      return dateString || 'Date not set'; // Return original string if error
     }
   };
 
-  // Enhanced function to get sacrament-specific details
+  // Improved function to format time
+  const formatTime = (timeString) => {
+    if (!timeString) return 'Time not set';
+    
+    try {
+      // If it's already in a readable format, return as is
+      if (typeof timeString === 'string' && (timeString.includes(':') || timeString.includes('AM') || timeString.includes('PM'))) {
+        return timeString;
+      }
+      
+      // Handle time objects or other formats
+      return String(timeString);
+    } catch (error) {
+      console.error('Time formatting error:', error);
+      return 'Time not set';
+    }
+  };
+
+  // Enhanced function to get sacrament-specific details - FIXED FOR FUNERAL
   const getSacramentDetails = (sacrament, data) => {
     const baseDetails = {
-      name: 'Not specified',
+      name: data.name || 'Not specified',
       date: 'Date not set',
       time: 'Time not set',
       details: `${sacrament} request`,
@@ -163,7 +228,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
       adminNotes: data.adminNotes || '',
       amount: data.amount || data.fee || data.donation || '0',
       paymentDate: data.paymentDate ? formatDate(data.paymentDate) : null,
-      submittedDate: formatDate(data.createdAt || data.submittedDate),
+      submittedDate: formatDate(data.createdAt || data.submittedDate || data.requestDate),
+      status: data.status || 'pending',
     };
 
     switch (sacrament) {
@@ -171,46 +237,47 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         return {
           ...baseDetails,
           name: data.name || 'Not specified',
-          date: formatDate(data.baptismDate),
-          time: data.baptismTime || 'Time not set',
+          date: formatDate(data.baptismDate || data.date),
+          time: formatTime(data.baptismTime || data.time),
           details: `Baptismal request for ${data.name}`,
-          amount: data.fee || '500',
+          amount: data.fee || data.amount || '500',
+          baptismType: data.baptismType || 'Common Baptism',
         };
       case 'Kumpil':
         return {
           ...baseDetails,
-          name: data.confirmandName || 'Not specified',
-          date: formatDate(data.kumpilDate),
-          time: data.kumpilTime || 'Time not set',
-          details: `Confirmation request for ${data.confirmandName}`,
-          amount: '300',
+          name: data.confirmandName || data.name || 'Not specified',
+          date: formatDate(data.kumpilDate || data.date),
+          time: formatTime(data.kumpilTime || data.time),
+          details: `Confirmation request for ${data.confirmandName || data.name}`,
+          amount: data.fee || data.amount || '300',
         };
       case 'Kasal':
         return {
           ...baseDetails,
           name: `${data.groomName || 'Groom'} & ${data.brideName || 'Bride'}`,
-          date: formatDate(data.marriageDate),
-          time: data.marriageTime || 'Time not set',
+          date: formatDate(data.marriageDate || data.date),
+          time: formatTime(data.marriageTime || data.time),
           details: `Marriage request`,
-          amount: '2000',
+          amount: data.fee || data.amount || '2000',
         };
       case 'Pamisa':
         return {
           ...baseDetails,
-          name: data.names?.[0] || 'Not specified',
-          date: data.displayDate || data.date || 'Date not set',
-          time: data.displayTime || data.time || 'Time not set',
+          name: Array.isArray(data.names) ? data.names[0] : (data.names || 'Not specified'),
+          date: data.displayDate || formatDate(data.date) || 'Date not set',
+          time: data.displayTime || formatTime(data.time) || 'Time not set',
           details: `Mass intention: ${data.intention || 'Not specified'}`,
-          amount: data.donation || '0',
+          amount: data.donation || data.amount || '0',
         };
       case 'Blessing':
         return {
           ...baseDetails,
           name: data.name || 'Not specified',
-          date: data.displayDate || data.date || 'Date not set',
-          time: data.displayTime || data.time || 'Time not set',
+          date: data.displayDate || formatDate(data.date) || 'Date not set',
+          time: data.displayTime || formatTime(data.time) || 'Time not set',
           details: `Blessing for: ${data.blessingType || 'Not specified'}`,
-          amount: '0',
+          amount: data.donation || data.amount || '0',
         };
       case 'Holy Orders':
         return {
@@ -218,17 +285,29 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           name: data.name || 'Not specified',
           date: 'To be scheduled',
           time: 'To be scheduled',
-          details: `Vocational calling application`,
+          details: `Vocational calling application - ${data.name}`,
           amount: '0',
         };
       case 'First Communion':
         return {
           ...baseDetails,
           name: data.childName || data.name || 'Not specified',
-          date: formatDate(data.communionDate),
-          time: data.communionTime || 'Time not set',
-          details: `First Communion request`,
-          amount: '300',
+          date: formatDate(data.communionDate || data.date),
+          time: formatTime(data.communionTime || data.time),
+          details: `First Communion request for ${data.childName || data.name}`,
+          amount: data.fee || data.amount || '300',
+        };
+      case 'Funeral Service': // FIXED FOR FUNERAL SERVICE
+        return {
+          ...baseDetails,
+          name: data.nameOfDeceased || 'Not specified',
+          date: data.scheduleDate || data.displayDate || 'Date not set', // Use scheduleDate directly
+          time: data.scheduleTime || data.displayTime || 'Time not set', // Use scheduleTime directly
+          details: `Funeral service for ${data.nameOfDeceased || 'deceased'}`,
+          amount: data.donation || data.amount || '0',
+          causeOfDeath: data.causeOfDeath || '',
+          placeOfBurial: data.placeOfBurialCemetery || '',
+          informant: data.informant || '',
         };
       default:
         return baseDetails;
@@ -242,18 +321,27 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     setModalVisible(true);
   };
 
-  // IMPROVED: Fetch all requests using API endpoints
+  // CRITICAL FIX: Enhanced function to verify request belongs to current user
+  const verifyRequestOwnership = (request, userEmail) => {
+    const submittedBy = request.submittedByEmail || request.email;
+    console.log(`🔍 Verifying ownership: ${submittedBy} vs ${userEmail}`);
+    
+    // Check if the request belongs to the current user
+    return submittedBy && submittedBy.toLowerCase() === userEmail.toLowerCase();
+  };
+
+  // IMPROVED: Fetch all requests using API endpoints with OWNERSHIP VERIFICATION
   const fetchAllRequestsByEmail = async (email) => {
     if (!email) {
+      console.log('❌ No email provided for fetching requests');
       setLoading(false);
       setRefreshing(false);
       return;
     }
 
     try {
-      console.log('🔍 Fetching all requests for:', email);
+      console.log('🔍 Fetching all requests for logged-in user:', email);
       
-      // Fetch from individual API endpoints
       const endpoints = [
         { url: `${API_URL}/baptismrequests/${email}`, type: 'Baptism' },
         { url: `${API_URL}/kumpil_requests/${email}`, type: 'Kumpil' },
@@ -261,68 +349,101 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         { url: `${API_URL}/pamisa_requests/${email}`, type: 'Pamisa' },
         { url: `${API_URL}/blessing_requests/${email}`, type: 'Blessing' },
         { url: `${API_URL}/holy_orders_requests/${email}`, type: 'Holy Orders' },
-        { url: `${API_URL}/first_communion_requests/${email}`, type: 'First Communion' }
+        { url: `${API_URL}/first_communion_requests/${email}`, type: 'First Communion' },
+        { url: `${API_URL}/funeral_requests/${email}`, type: 'Funeral Service' }
       ];
 
       let allData = [];
+      let successfulFetches = 0;
+      let totalRequestsFound = 0;
+      let userRequestsFound = 0;
 
       for (const endpoint of endpoints) {
         try {
-          console.log(`📡 Fetching from: ${endpoint.url}`);
+          console.log(`📡 Fetching ${endpoint.type} from: ${endpoint.url}`);
           
-          const response = await fetch(endpoint.url);
+          const response = await fetch(endpoint.url, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000, // 10 second timeout
+          });
           
           if (!response.ok) {
-            console.log(`❌ ${endpoint.type} endpoint failed:`, response.status);
+            console.log(`❌ ${endpoint.type} endpoint failed:`, response.status, response.statusText);
             continue;
           }
 
           const data = await response.json();
-          console.log(`✅ ${endpoint.type} response:`, Array.isArray(data) ? data.length : 'Not array');
+          console.log(`✅ ${endpoint.type} raw response count:`, Array.isArray(data) ? data.length : 'Not array');
 
           if (Array.isArray(data)) {
-            // Map to common format
-            const formattedRequests = data.map(item => ({
-              id: item._id?.$oid || item._id || Math.random().toString(),
-              sacrament: endpoint.type,
-              ...getSacramentDetails(endpoint.type, item),
-              status: item.status || 'pending',
-              icon: getSacramentIcon(endpoint.type),
-              fullData: item,
-              collection: endpoint.type.toLowerCase().replace(' ', '') + 'requests'
-            }));
+            // CRITICAL: Filter requests to only include those belonging to the current user
+            const userRequests = data.filter(request => 
+              verifyRequestOwnership(request, email)
+            );
+
+            console.log(`👤 ${endpoint.type} user-specific requests:`, userRequests.length);
+
+            const formattedRequests = userRequests.map(item => {
+              const details = getSacramentDetails(endpoint.type, item);
+              return {
+                id: item._id?.$oid || item._id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                sacrament: endpoint.type,
+                ...details,
+                status: item.status || 'pending',
+                icon: getSacramentIcon(endpoint.type),
+                fullData: item,
+                collection: endpoint.type.toLowerCase().replace(' ', '_') + 'requests',
+                requestNumber: item.requestNumber || `REQ-${Date.now()}`,
+                submittedBy: item.submittedByEmail || item.email,
+              };
+            });
 
             allData = [...allData, ...formattedRequests];
-            console.log(`✅ ${endpoint.type} user requests:`, formattedRequests.length);
+            successfulFetches++;
+            totalRequestsFound += data.length;
+            userRequestsFound += userRequests.length;
+            
+            console.log(`✅ ${endpoint.type} user requests after filtering:`, formattedRequests.length);
+          } else {
+            console.log(`⚠️ ${endpoint.type} response is not an array:`, typeof data);
           }
         } catch (error) {
-          console.error(`❌ Error fetching ${endpoint.type}:`, error);
+          console.error(`❌ Error fetching ${endpoint.type}:`, error.message);
         }
       }
 
+      console.log(`📊 REQUEST SUMMARY:`);
+      console.log(`   ✅ Successful fetches: ${successfulFetches}/${endpoints.length}`);
+      console.log(`   📥 Total requests found: ${totalRequestsFound}`);
+      console.log(`   👤 User-specific requests: ${userRequestsFound}`);
+      console.log(`   🎯 Final user requests: ${allData.length}`);
+
       // Sort by date (newest first)
       allData.sort((a, b) => {
-        const dateA = new Date(a.fullData.createdAt || 0);
-        const dateB = new Date(b.fullData.createdAt || 0);
+        const dateA = new Date(a.fullData.createdAt || a.fullData.requestDate || 0);
+        const dateB = new Date(b.fullData.createdAt || b.fullData.requestDate || 0);
         return dateB - dateA;
       });
 
       setAllRequests(allData);
       
-      console.log(`✅ Total loaded: ${allData.length} requests`);
-      console.log('📊 Breakdown:', {
-        baptism: allData.filter(item => item.sacrament === 'Baptism').length,
-        kumpil: allData.filter(item => item.sacrament === 'Kumpil').length,
-        kasal: allData.filter(item => item.sacrament === 'Kasal').length,
-        pamisa: allData.filter(item => item.sacrament === 'Pamisa').length,
-        blessing: allData.filter(item => item.sacrament === 'Blessing').length,
-        holyOrders: allData.filter(item => item.sacrament === 'Holy Orders').length,
-        firstCommunion: allData.filter(item => item.sacrament === 'First Communion').length
+      console.log(`✅ FINAL: Loaded ${allData.length} requests for user: ${email}`);
+      console.log('📊 Breakdown by sacrament:');
+      endpoints.forEach(endpoint => {
+        const count = allData.filter(item => item.sacrament === endpoint.type).length;
+        console.log(`   ${endpoint.type}: ${count}`);
       });
 
     } catch (error) {
       console.error('❌ Error fetching requests:', error);
-      Alert.alert('Error', 'Failed to load your requests. Please check your connection.');
+      Alert.alert(
+        'Connection Error', 
+        'Failed to load your requests. Please check your connection and try again.',
+        [{ text: 'OK' }]
+      );
       setAllRequests([]);
     } finally {
       setLoading(false);
@@ -334,17 +455,21 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
   useEffect(() => {
     const loadUserData = async () => {
       try {
+        setLoading(true);
         const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
         if (userData) {
           const user = JSON.parse(userData);
+          console.log('👤 CURRENT LOGGED-IN USER:', user.email);
           setUserEmail(user.email);
           await fetchAllRequestsByEmail(user.email);
         } else {
+          console.log('❌ No user data found in storage - user not logged in');
           setLoading(false);
           setAllRequests([]);
         }
       } catch (error) {
-        console.error('Error loading user data:', error);
+        console.error('❌ Error loading user data:', error);
+        Alert.alert('Error', 'Failed to load user data.');
         setLoading(false);
       }
     };
@@ -352,11 +477,26 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     loadUserData();
   }, []);
 
+  // Refresh when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (userEmail) {
+        console.log('🔄 Screen focused, refreshing data for user:', userEmail);
+        handleRefresh();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, userEmail]);
+
   // Handler for refreshing data
   const handleRefresh = async () => {
     if (userEmail) {
+      console.log('🔄 Manual refresh triggered for user:', userEmail);
       setRefreshing(true);
       await fetchAllRequestsByEmail(userEmail);
+    } else {
+      setRefreshing(false);
     }
   };
 
@@ -369,56 +509,82 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 
   // Function to navigate to specific sacrament form
   const navigateToSacramentForm = (sacrament) => {
-    switch (sacrament) {
-      case 'Baptism':
-        navigation.navigate('BaptismForm');
-        break;
-      case 'Kumpil':
-        navigation.navigate('KumpilForm');
-        break;
-      case 'Kasal':
-        navigation.navigate('MarriageForm');
-        break;
-      case 'Pamisa':
-        navigation.navigate('PamisaForm');
-        break;
-      case 'Blessing':
-        navigation.navigate('BlessingForm');
-        break;
-      case 'Holy Orders':
-        navigation.navigate('HolyOrdersForm');
-        break;
-      case 'First Communion':
-        navigation.navigate('FirstCommunionForm');
-        break;
-      default:
-        Alert.alert('Info', 'Form not available for this sacrament.');
+    const formRoutes = {
+      'Baptism': 'BaptismForm',
+      'Kumpil': 'KumpilForm',
+      'Kasal': 'MarriageForm',
+      'Pamisa': 'PamisaForm',
+      'Blessing': 'BlessingForm',
+      'Holy Orders': 'HolyOrdersForm',
+      'First Communion': 'FirstCommunionForm',
+      'Funeral Service': 'FuneralForm'
+    };
+
+    const route = formRoutes[sacrament];
+    if (route) {
+      navigation.navigate(route);
+    } else {
+      Alert.alert('Info', 'Form not available for this sacrament.');
     }
   };
 
-  const renderItemCard = (item) => {
+  const renderItemCard = (item, index) => {
+    const isHolyOrders = item.sacrament === 'Holy Orders';
+    const isFuneralService = item.sacrament === 'Funeral Service';
+    
     return (
       <TouchableOpacity
-        key={item.id}
-        style={styles.card}
+        key={item.id || `item-${index}`}
+        style={[
+          styles.card,
+          isHolyOrders && styles.holyOrdersCard,
+          isFuneralService && styles.funeralCard
+        ]}
         onPress={() => handleItemPress(item)}
         activeOpacity={0.8}
       >
         <View style={styles.cardHeader}>
-          <Ionicons name={item.icon} size={28} color={PRIMARY_COLOR} />
+          <Ionicons 
+            name={item.icon} 
+            size={28} 
+            color={isHolyOrders ? PRIMARY_COLOR : (isFuneralService ? '#7e22ce' : SECONDARY_COLOR)}
+          />
           <View style={styles.titleContainer}>
             <Text style={styles.sacramentName}>{item.sacrament}</Text>
-            <Text style={styles.requestName}>{item.name}</Text>
+            <Text style={styles.requestName} numberOfLines={1}>
+              {item.name}
+            </Text>
           </View>
           <StatusBadge status={item.status} paymentStatus={item.paymentStatus} />
         </View>
 
         <View style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={16} color="#6b7280" style={styles.detailIcon} />
-          <Text style={styles.detailText}>Schedule: {item.date} at {item.time}</Text>
+          <Text style={styles.detailText}>
+            {isHolyOrders ? 'Application Date:' : 'Schedule:'} {item.date} {!isHolyOrders && `at ${item.time}`}
+          </Text>
         </View>
 
-        {item.amount !== '0' && (
+        {/* FUNERAL SPECIFIC DETAILS */}
+        {isFuneralService && item.causeOfDeath && (
+          <View style={styles.detailRow}>
+            <Ionicons name="warning-outline" size={16} color="#6b7280" style={styles.detailIcon} />
+            <Text style={styles.detailText}>
+              Cause: {item.causeOfDeath}
+            </Text>
+          </View>
+        )}
+
+        {isFuneralService && item.placeOfBurial && (
+          <View style={styles.detailRow}>
+            <Ionicons name="location-outline" size={16} color="#6b7280" style={styles.detailIcon} />
+            <Text style={styles.detailText}>
+              Burial: {item.placeOfBurial}
+            </Text>
+          </View>
+        )}
+
+        {item.amount !== '0' && item.amount !== '0' && (
           <View style={styles.detailRow}>
             <Ionicons name="cash-outline" size={16} color="#6b7280" style={styles.detailIcon} />
             <Text style={styles.detailText}>
@@ -466,6 +632,35 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
             <Text style={styles.adminNotesText}>Admin Notes: {item.adminNotes}</Text>
           </View>
         )}
+
+        {/* Special note for Holy Orders */}
+        {isHolyOrders && (
+          <View style={styles.specialNote}>
+            <Ionicons name="information-circle" size={16} color={PRIMARY_COLOR} />
+            <Text style={styles.specialNoteText}>
+              This is a vocational application. The parish will contact you for further steps.
+            </Text>
+          </View>
+        )}
+
+        {/* Special note for Funeral Service */}
+        {isFuneralService && (
+          <View style={styles.specialNote}>
+            <Ionicons name="information-circle" size={16} color="#7e22ce" />
+            <Text style={styles.specialNoteText}>
+              Funeral service request. The parish will contact you for confirmation.
+            </Text>
+          </View>
+        )}
+
+        {/* Debug info - shows which user submitted this request */}
+        {__DEV__ && (
+          <View style={styles.debugInfo}>
+            <Text style={styles.debugText}>
+              Submitted by: {item.submittedBy || 'Unknown'}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -506,88 +701,61 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 colors={[PRIMARY_COLOR]}
+                tintColor={PRIMARY_COLOR}
               />
             }
           >
             <View style={styles.summaryContainer}>
               <Text style={styles.summaryText}>
-                You have {allRequests.length} total sacrament request{allRequests.length !== 1 ? 's' : ''}
+                You have {allRequests.length} sacrament request{allRequests.length !== 1 ? 's' : ''}
               </Text>
               <Text style={styles.summarySubtext}>
-                Track your requests, payment status, and any updates here
+                These are all requests submitted by you ({userEmail})
               </Text>
             </View>
             
-            {allRequests.map(renderItemCard)}
+            {allRequests.map((item, index) => renderItemCard(item, index))}
+            
+            <View style={styles.footerNote}>
+              <Text style={styles.footerNoteText}>
+                💡 Pull down to refresh and see the latest updates
+              </Text>
+            </View>
           </ScrollView>
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={64} color="#9ca3af" />
-            <Text style={styles.emptyText}>No sacrament requests found</Text>
+            <Ionicons name="calendar-outline" size={80} color="#9ca3af" />
+            <Text style={styles.emptyText}>No Sacrament Requests</Text>
             <Text style={styles.emptySubtext}>
               {userEmail 
-                ? "You haven't submitted any sacrament requests yet."
-                : 'Please login to view your requests.'
+                ? `You haven't submitted any sacrament requests yet using ${userEmail}. Start by choosing a sacrament below.`
+                : 'Please login to view your sacrament requests.'
               }
             </Text>
             
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={() => navigateToSacramentForm('Baptism')}
-              >
-                <Ionicons name="water-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Baptism</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={() => navigateToSacramentForm('Kumpil')}
-              >
-                <Ionicons name="flame-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Kumpil</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={() => navigateToSacramentForm('Kasal')}
-              >
-                <Ionicons name="heart-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Marriage</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={() => navigateToSacramentForm('Pamisa')}
-              >
-                <Ionicons name="book-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Pamisa</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={() => navigateToSacramentForm('Blessing')}
-              >
-                <Ionicons name="star-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Blessing</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={() => navigateToSacramentForm('Holy Orders')}
-              >
-                <Ionicons name="person-add-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>Holy Orders</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.submitButton}
-                onPress={() => navigateToSacramentForm('First Communion')}
-              >
-                <Ionicons name="wine-outline" size={20} color="white" />
-                <Text style={styles.submitButtonText}>First Communion</Text>
-              </TouchableOpacity>
-            </View>
+            {userEmail && (
+              <View style={styles.buttonContainer}>
+                {[
+                  { sacrament: 'Baptism', icon: 'water-outline' },
+                  { sacrament: 'Kumpil', icon: 'flame-outline' },
+                  { sacrament: 'Kasal', icon: 'heart-outline' },
+                  { sacrament: 'Pamisa', icon: 'book-outline' },
+                  { sacrament: 'Blessing', icon: 'star-outline' },
+                  { sacrament: 'Holy Orders', icon: 'person-add-outline' },
+                  { sacrament: 'First Communion', icon: 'wine-outline' },
+                  { sacrament: 'Funeral Service', icon: 'flower-outline' },
+                ].map(({ sacrament, icon }) => (
+                  <TouchableOpacity 
+                    key={sacrament}
+                    style={styles.submitButton}
+                    onPress={() => navigateToSacramentForm(sacrament)}
+                  >
+                    <Ionicons name={icon} size={20} color="white" />
+                    <Text style={styles.submitButtonText}>{sacrament}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -604,39 +772,66 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: BACKGROUND_COLOR },
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: BACKGROUND_COLOR 
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: CARD_BACKGROUND,
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
     elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  backButton: { padding: 5 },
-  refreshButton: { padding: 5 },
-  title: { fontSize: 20, fontWeight: "800", color: PRIMARY_COLOR },
+  backButton: { 
+    padding: 8 
+  },
+  refreshButton: { 
+    padding: 8 
+  },
+  title: { 
+    fontSize: 18, 
+    fontWeight: "700", 
+    color: PRIMARY_COLOR 
+  },
   userInfo: {
-    padding: 10,
-    backgroundColor: SECONDARY_COLOR,
+    padding: 12,
+    backgroundColor: SECONDARY_COLOR + '20',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: SECONDARY_COLOR + '40',
   },
   userText: {
-    color: 'white',
+    color: PRIMARY_COLOR,
     fontWeight: '600',
     fontSize: 14,
   },
-  contentContainer: { flex: 1, paddingTop: 10 },
-  scrollContainer: { flex: 1 },
-  scrollViewContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  contentContainer: { 
+    flex: 1, 
+    paddingTop: 8 
+  },
+  scrollContainer: { 
+    flex: 1 
+  },
+  scrollViewContent: { 
+    paddingHorizontal: 16, 
+    paddingBottom: 20 
+  },
   summaryContainer: {
     backgroundColor: '#e0f2fe',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: PRIMARY_COLOR,
   },
   summaryText: {
     fontSize: 16,
@@ -645,38 +840,44 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   summarySubtext: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
-    marginTop: 5,
+    marginTop: 4,
   },
   card: {
     backgroundColor: CARD_BACKGROUND,
-    padding: 18,
-    borderRadius: 15,
-    marginBottom: 15,
-    borderLeftWidth: 6,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
     borderLeftColor: SECONDARY_COLOR,
-    elevation: 4,
+    elevation: 2,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
+  },
+  holyOrdersCard: {
+    borderLeftColor: PRIMARY_COLOR,
+    backgroundColor: '#f0f9ff',
+  },
+  funeralCard: {
+    borderLeftColor: '#7e22ce',
+    backgroundColor: '#faf5ff',
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-    paddingBottom: 10,
+    marginBottom: 12,
   },
   titleContainer: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
+    marginRight: 8,
   },
   sacramentName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
     color: "#1f2937",
   },
@@ -687,32 +888,34 @@ const styles = StyleSheet.create({
   },
   statusContainer: {
     alignItems: 'flex-end',
+    minWidth: 80,
   },
   statusBadge: { 
-    paddingHorizontal: 10, 
+    paddingHorizontal: 8, 
     paddingVertical: 4, 
-    borderRadius: 15,
+    borderRadius: 12,
     marginBottom: 4,
   },
   statusText: { 
     color: CARD_BACKGROUND, 
-    fontSize: 12, 
-    fontWeight: "bold" 
+    fontSize: 11, 
+    fontWeight: "700",
+    textAlign: 'center',
   },
   paymentBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   paymentText: {
     color: CARD_BACKGROUND,
     fontSize: 10,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   detailRow: { 
     flexDirection: "row", 
     alignItems: "flex-start", 
-    marginTop: 8 
+    marginTop: 6 
   },
   detailIcon: { 
     marginRight: 8, 
@@ -723,6 +926,7 @@ const styles = StyleSheet.create({
     color: "#374151", 
     fontWeight: "500",
     flex: 1,
+    lineHeight: 18,
   },
   reasonButton: {
     flexDirection: 'row',
@@ -730,7 +934,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef2f2',
     padding: 8,
     borderRadius: 8,
-    marginTop: 10,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: '#fecaca',
   },
@@ -738,7 +942,7 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 5,
+    marginLeft: 6,
   },
   adminNotesContainer: {
     flexDirection: 'row',
@@ -746,7 +950,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     padding: 8,
     borderRadius: 8,
-    marginTop: 10,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: '#dbeafe',
   },
@@ -754,58 +958,102 @@ const styles = StyleSheet.create({
     color: '#1e40af',
     fontSize: 12,
     fontWeight: '500',
-    marginLeft: 5,
+    marginLeft: 6,
     flex: 1,
+    lineHeight: 16,
+  },
+  specialNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f0f9ff',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  specialNoteText: {
+    color: PRIMARY_COLOR,
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 6,
+    flex: 1,
+    lineHeight: 16,
+    fontStyle: 'italic',
+  },
+  debugInfo: {
+    marginTop: 8,
+    padding: 4,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 4,
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
     color: PRIMARY_COLOR,
+    fontWeight: '500',
   },
   emptyState: { 
     flex: 1, 
     justifyContent: "center", 
     alignItems: "center", 
-    padding: 40 
+    padding: 24 
   },
   emptyText: { 
     fontSize: 20, 
     fontWeight: "600", 
     color: "#6b7280", 
-    marginTop: 20,
+    marginTop: 16,
     textAlign: 'center',
   },
   emptySubtext: { 
     fontSize: 16, 
     color: "#9ca3af", 
-    marginTop: 10, 
+    marginTop: 8, 
     textAlign: "center",
     lineHeight: 22,
+    paddingHorizontal: 20,
   },
   buttonContainer: {
-    marginTop: 30,
+    marginTop: 24,
     width: '100%',
-    gap: 12,
+    gap: 8,
   },
   submitButton: {
     backgroundColor: PRIMARY_COLOR,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
   },
   submitButtonText: {
     color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  footerNote: {
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  footerNoteText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
   // Modal Styles
   modalContainer: {
@@ -818,22 +1066,26 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: 'white',
     padding: 20,
-    borderRadius: 15,
-    width: '100%',
+    borderRadius: 16,
+    width: '90%',
     maxWidth: 400,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: PRIMARY_COLOR,
-    marginBottom: 15,
+    marginBottom: 16,
     textAlign: 'center',
+  },
+  reasonScroll: {
+    maxHeight: 200,
+    marginBottom: 20,
   },
   reasonText: {
     fontSize: 14,
     color: '#374151',
     lineHeight: 20,
-    marginBottom: 20,
     textAlign: 'left',
   },
   modalCloseButton: {

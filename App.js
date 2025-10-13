@@ -28,6 +28,7 @@ import FirstCommunionFormScreen from "./screens/FirstCommunionFormScreen";
 import BlessingFormScreen from "./screens/BlessingFormScreen";
 import HolyOrdenFormScreen from "./screens/HolyOrdenFormScreen";
 import KumpisalFormScreen from "./screens/KumpisalFormScreen";
+import BurialServiceFormScreen from "./screens/BurialServiceFormScreen";
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -62,6 +63,7 @@ export default function App() {
         />
         <Stack.Screen name="HolyOrdenForm" component={HolyOrdenFormScreen} />
         <Stack.Screen name="KumpisalForm" component={KumpisalFormScreen} />
+       <Stack.Screen name="BurialServiceForm" component={BurialServiceFormScreen} />
    </Stack.Navigator>
  </NavigationContainer>
   );

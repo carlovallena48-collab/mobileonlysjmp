@@ -33,15 +33,16 @@ const SECONDARY_COLOR = "#34d399";
 const BACKGROUND_COLOR = "#f0fdfa";
 const CARD_BACKGROUND = "#ffffff";
 
+// 🎨 DARKER SACRAMENT COLORS
 const SACRAMENT_COLORS = {
-  Baptism: { main: "#42a5f5", light: "#e3f2fd" },
-  Eucharist: { main: "#ef5350", light: "#ffebee" },
-  Reconciliation: { main: "#66bb6a", light: "#e8f5e9" },
-  Confirmation: { main: "#fbc02d", light: "#fffde7" },
-  Matrimony: { main: "#ec407a", light: "#fce4ec" },
-  HolyOrders: { main: "#4e342e", light: "#efebe9" },
-  Annointing: { main: "#9e9e9e", light: "#f5f5f5" },
-  Other: { main: PRIMARY_COLOR, light: BACKGROUND_COLOR },
+  Baptism: { main: "#e9ebf2ff", light: "#0a2894ff" }, // Dark Blue
+  Eucharist: { main: "#c6afafff", light: "#971010ff" }, // Dark Red
+  Reconciliation: { main: "#f4fbf7ff", light: "#045520ff" }, // Dark Green
+  Confirmation: { main: "#eae7e1ff", light: "#938915ff" }, // Dark Yellow
+  Matrimony: { main: "#f4f4f4ff", light: "#93125bff" }, // Dark Pink
+  HolyOrders: { main: "#fefaf7ff", light: "#6e5a08ff" }, // Dark Brown
+  Annointing: { main: "#f4f6faff", light: "#062258ff" }, // Dark Gray
+  Other: { main: "#eeeaf3ff", light: "#431079ff" }, // Dark Purple
 };
 
 const sacraments = [
@@ -79,6 +80,9 @@ const DashboardScreen = ({ navigation }) => {
   };
 
   const handleHistoryPress = () => navigation.navigate("ScheduleHistoryScreen");
+  
+  // 🆕 NEW FUNCTION: Navigate to Request Certificate Screen
+  const handleCertificatePress = () => navigation.navigate("RequestCertificate");
 
   const handleNavPress = (navItem) => {
     setActiveNav(navItem.route);
@@ -103,7 +107,7 @@ const DashboardScreen = ({ navigation }) => {
             {
               backgroundColor: lightColor,
               borderColor: cardColor,
-              borderWidth: 1,
+              borderWidth: 2, // Thicker border for better visibility
               shadowColor: cardColor,
               shadowOpacity: 0.4,
               shadowRadius: 8,
@@ -271,12 +275,41 @@ const DashboardScreen = ({ navigation }) => {
             />
           </View>
 
-          <View style={styles.historySection}>
-            <TouchableOpacity style={styles.historyButton} onPress={handleHistoryPress} activeOpacity={0.8}>
-              <Ionicons name="time-outline" size={24} color={CARD_BACKGROUND} />
-              <Text style={styles.historyButtonText}>My Requests History</Text>
-              <Feather name="chevron-right" size={24} color={CARD_BACKGROUND} />
-            </TouchableOpacity>
+          {/* 🆕 UPDATED: TWO BUTTONS SECTION - History and Certificate */}
+          <View style={styles.buttonsSection}>
+            <View style={styles.buttonsRow}>
+              {/* History Button */}
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.historyButton]} 
+                onPress={handleHistoryPress} 
+                activeOpacity={0.8}
+              >
+                <View style={styles.buttonIconContainer}>
+                  <Ionicons name="time-outline" size={24} color={CARD_BACKGROUND} />
+                </View>
+                <View style={styles.buttonTextContainer}>
+                  <Text style={styles.actionButtonText}>My Requests History</Text>
+                  <Text style={styles.actionButtonSubtext}>View all your submitted requests</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={CARD_BACKGROUND} />
+              </TouchableOpacity>
+
+              {/* Certificate Button */}
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.certificateButton]} 
+                onPress={handleCertificatePress} 
+                activeOpacity={0.8}
+              >
+                <View style={styles.buttonIconContainer}>
+                  <Ionicons name="document-text-outline" size={24} color={CARD_BACKGROUND} />
+                </View>
+                <View style={styles.buttonTextContainer}>
+                  <Text style={styles.actionButtonText}>Request Certificate</Text>
+                  <Text style={styles.actionButtonSubtext}>Get baptismal, marriage certificates</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={CARD_BACKGROUND} />
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -305,7 +338,7 @@ const DashboardScreen = ({ navigation }) => {
 
 export default DashboardScreen;
 
-// --- Updated Stylesheet ---
+// --- UPDATED STYLESHEET ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -490,31 +523,59 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
-  historySection: {
+  // 🆕 NEW STYLES FOR TWO BUTTONS SECTION
+  buttonsSection: {
     marginBottom: 20,
   },
   
-  historyButton: {
+  buttonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: PRIMARY_COLOR, 
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderRadius: 16,
     elevation: 6,
-    shadowColor: PRIMARY_COLOR,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
+    marginHorizontal: 5,
   },
-  
-  historyButtonText: {
-    fontSize: 18,
-    fontWeight: '800',
+
+  historyButton: {
+    backgroundColor: '#1e40af', // Dark Blue
+    shadowColor: '#1e40af',
+  },
+
+  certificateButton: {
+    backgroundColor: '#7e22ce', // Dark Purple
+    shadowColor: '#7e22ce',
+  },
+
+  buttonIconContainer: {
+    marginRight: 12,
+  },
+
+  buttonTextContainer: {
+    flex: 1,
+  },
+
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
     color: CARD_BACKGROUND,
-    flex: 1, 
-    textAlign: 'center',
+    marginBottom: 2,
+  },
+
+  actionButtonSubtext: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 12,
   },
 
   bottomNav: {
@@ -555,7 +616,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   
-  // ⭐️ UPDATED MODAL STYLES ⭐️
+  // MODAL STYLES
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',

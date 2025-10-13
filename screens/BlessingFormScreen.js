@@ -12,6 +12,7 @@ import {
   Image 
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Get screen width for responsive sizing
 const { width } = Dimensions.get('window');
@@ -23,6 +24,8 @@ const COLOR_LIGHT = '#DCEDC8';        // Pale Green (Section Background)
 const COLOR_BACKGROUND = '#F4F8F4';   // Light Off-White/Greenish
 const COLOR_TEXT_DARK = '#212121';
 const COLOR_TEXT_LIGHT = '#FAFAFA';
+
+const USER_STORAGE_KEY = '@userData';
 
 const BlessingFormScreen = () => {
     const blessingOptions = ['HOUSE', 'BUSINESS', 'TRUCK', 'FUNERAL', 'OTHER'];
@@ -42,6 +45,25 @@ const BlessingFormScreen = () => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedTime, setSelectedTime] = useState(new Date());
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userEmail, setUserEmail] = useState('');
+
+    // Load user data on component mount
+    React.useEffect(() => {
+        const loadUserData = async () => {
+            try {
+                const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    setUserEmail(user.email);
+                    console.log('👤 Current user:', user.email);
+                }
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+        };
+
+        loadUserData();
+    }, []);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -107,6 +129,12 @@ const BlessingFormScreen = () => {
             return;
         }
 
+        // Check if user is logged in
+        if (!userEmail) {
+            Alert.alert('Login Required', 'Please login first before submitting a blessing request.');
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -118,10 +146,15 @@ const BlessingFormScreen = () => {
                 contactNumber: formData.contactNumber,
                 date: formData.date,
                 time: formData.time,
+                displayDate: formData.date,
+                displayTime: formData.time,
                 status: 'pending',
-                submittedAt: new Date().toISOString(),
+                submittedByEmail: userEmail, // CRITICAL: Add user email
+                createdAt: new Date().toISOString(),
                 requestNumber: `BLESS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
             };
+
+            console.log('📤 Submitting Blessing request:', submissionData);
 
             const response = await fetch('http://10.173.231.17:5000/api/blessing_requests', {
                 method: 'POST',
@@ -140,21 +173,27 @@ const BlessingFormScreen = () => {
 
             Alert.alert(
                 'Tagumpay! 🎉', 
-                `Matagumpay na naipadala ang inyong kahilingan!\n\n📋 Request Number: ${result.requestNumber}\n📅 Petsa: ${formData.date}\n⏰ Oras: ${formData.time}\n\nKokontakin po namin kayo para sa kumpirmasyon.`
+                `Matagumpay na naipadala ang inyong kahilingan!\n\n📋 Request Number: ${result.requestNumber}\n📅 Petsa: ${formData.date}\n⏰ Oras: ${formData.time}\n\nKokontakin po namin kayo para sa kumpirmasyon.`,
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            // Reset form data after successful submission
+                            setFormData({
+                                name: '',
+                                blessingType: '',
+                                requestForDetails: '',
+                                address: '',
+                                contactNumber: '',
+                                date: '',
+                                time: ''
+                            });
+                            setSelectedDate(new Date());
+                            setSelectedTime(new Date());
+                        }
+                    }
+                ]
             );
-
-            // Reset form data after successful submission
-            setFormData({
-                name: '',
-                blessingType: '',
-                requestForDetails: '',
-                address: '',
-                contactNumber: '',
-                date: '',
-                time: ''
-            });
-            setSelectedDate(new Date());
-            setSelectedTime(new Date());
 
         } catch (error) {
             console.error('Submission error:', error);
@@ -288,7 +327,6 @@ const BlessingFormScreen = () => {
                                 <Text style={formData.date ? styles.pickerButtonText : styles.pickerButtonPlaceholder}>
                                     {formData.date || 'Piliin ang Petsa'}
                                 </Text>
-                              
                             </TouchableOpacity>
                         </View>
 
@@ -305,7 +343,6 @@ const BlessingFormScreen = () => {
                                 <Text style={formData.time ? styles.pickerButtonText : styles.pickerButtonPlaceholder}>
                                     {formData.time || 'Piliin ang Oras'}
                                 </Text>
-                               
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -348,12 +385,18 @@ const BlessingFormScreen = () => {
                     )}
                 </TouchableOpacity>
 
+                {/* User Info */}
+                {userEmail && (
+                    <View style={styles.userInfo}>
+                        <Text style={styles.userInfoText}>Submitting as: {userEmail}</Text>
+                    </View>
+                )}
+
                 {/* Instructions */}
                 <View style={styles.instructionsCard}>
                     <Text style={styles.instructionsTitle}>📋 Mahalagang Paalala:</Text>
                     <Text style={styles.instructionItem}>• Ang schedule ay subject sa availability ng pari</Text>
                     <Text style={styles.instructionItem}>• Kokontakin ka namin para sa kumpirmasyon</Text>
-                 
                     <Text style={styles.instructionItem}>• Magdala ng mga kailangan para sa seremonya</Text>
                 </View>
             </View>
@@ -372,6 +415,18 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     
+    userInfo: {
+        backgroundColor: '#e3f2fd',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    userInfoText: {
+        fontSize: 12,
+        color: '#1976d2',
+        fontWeight: '500',
+    },
     // Header Styles
     header: {
         backgroundColor: COLOR_PRIMARY_DARK, 

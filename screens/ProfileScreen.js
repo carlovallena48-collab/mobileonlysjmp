@@ -719,9 +719,7 @@ const ProfileScreen = () => {
                     <Text style={[styles.navText, { color: COLORS.textGray }]}>Home</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    onPress={() =>
-                        Alert.alert("Navigate", "Request Schedule screen is not yet implemented.")
-                    }
+                     onPress={() => navigation.navigate("MyRequests")}
                     style={styles.navItem}
                 >
                     <Ionicons name="calendar-outline" size={24} color={COLORS.textGray} />

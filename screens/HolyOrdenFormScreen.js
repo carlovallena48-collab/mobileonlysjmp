@@ -11,12 +11,13 @@ import {
   Platform,
   ImageBackground,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  ActivityIndicator
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 
-const HolyOrdenForm = () => {
+const HolyOrderForm = () => {
   const navigation = useNavigation();
   const [formData, setFormData] = useState({
     name: '',
@@ -26,71 +27,159 @@ const HolyOrdenForm = () => {
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+    contactNumber: false
+  });
 
-  const validateForm = () => {
-    const newErrors = {};
+  const validateField = (field, value) => {
+    const newErrors = { ...errors };
 
-    // Name validation
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
-    }
+    switch (field) {
+      case 'name':
+        if (!value.trim()) {
+          newErrors.name = 'Name is required';
+        } else if (value.trim().length < 2) {
+          newErrors.name = 'Name must be at least 2 characters';
+        } else if (!/^[a-zA-Z\s]+$/.test(value.trim())) {
+          newErrors.name = 'Name should contain only letters and spaces';
+        } else {
+          delete newErrors.name;
+        }
+        break;
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
+      case 'email':
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!value) {
+          newErrors.email = 'Email is required';
+        } else if (!emailRegex.test(value)) {
+          newErrors.email = 'Please enter a valid email address';
+        } else {
+          delete newErrors.email;
+        }
+        break;
 
-    // Contact number validation
-    const phoneRegex = /^[0-9+\-\s()]{10,}$/;
-    if (!formData.contactNumber) {
-      newErrors.contactNumber = 'Contact number is required';
-    } else if (!phoneRegex.test(formData.contactNumber.replace(/\s/g, ''))) {
-      newErrors.contactNumber = 'Please enter a valid contact number';
+      case 'contactNumber':
+        const phoneRegex = /^(09|\+639)\d{9}$/;
+        const cleanNumber = value.replace(/\s/g, '');
+        if (!value) {
+          newErrors.contactNumber = 'Contact number is required';
+        } else if (!phoneRegex.test(cleanNumber)) {
+          newErrors.contactNumber = 'Please enter a valid Philippine mobile number (09XXXXXXXXX)';
+        } else {
+          delete newErrors.contactNumber;
+        }
+        break;
+
+      default:
+        break;
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateForm = () => {
+    validateField('name', formData.name);
+    validateField('email', formData.email);
+    validateField('contactNumber', formData.contactNumber);
+    
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+    // Real-time validation when user types
+    if (touched[field]) {
+      validateField(field, value);
+    }
+  };
+
+  const handleInputBlur = (field) => {
+    setTouched(prev => ({
+      ...prev,
+      [field]: true
+    }));
+    validateField(field, formData[field]);
+  };
+
+  const formatPhoneNumber = (value) => {
+    // Format as 09XX XXX XXXX
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 4) {
+      return numbers;
+    } else if (numbers.length <= 7) {
+      return `${numbers.slice(0, 4)} ${numbers.slice(4)}`;
+    } else {
+      return `${numbers.slice(0, 4)} ${numbers.slice(4, 7)} ${numbers.slice(7, 11)}`;
+    }
+  };
+
+  const handlePhoneChange = (value) => {
+    const formatted = formatPhoneNumber(value);
+    handleInputChange('contactNumber', formatted);
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    // Mark all fields as touched
+    setTouched({
+      name: true,
+      email: true,
+      contactNumber: true
+    });
+
+    if (!validateForm()) {
+      Alert.alert('Validation Error', 'Please fix the errors in the form before submitting.');
+      return;
+    }
 
     setIsSubmitting(true);
     
     try {
-      // Gamitin ang email mula sa form mismo
       const userEmail = formData.email.trim().toLowerCase();
+      const submissionData = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        contactNumber: formData.contactNumber.replace(/\s/g, ''),
+        submittedByEmail: userEmail,
+        createdAt: new Date().toISOString()
+      };
+
+      console.log('📤 Submitting Holy Orders request:', submissionData);
       
       const response = await fetch('http://10.173.231.17:5000/api/holy_orders_requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          contactNumber: formData.contactNumber,
-          submittedByEmail: userEmail
-        }),
+        body: JSON.stringify(submissionData),
+        timeout: 10000, // 10 second timeout
       });
 
       // Check response status
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Server response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error('Server response error:', errorText);
+        
+        if (response.status === 400) {
+          throw new Error('Invalid data submitted. Please check your information.');
+        } else if (response.status === 500) {
+          throw new Error('Server error. Please try again later.');
+        } else {
+          throw new Error(`Network error: ${response.status}`);
+        }
       }
 
       const result = await response.json();
+      console.log('✅ Submission successful:', result);
 
       Alert.alert(
-        'Application Submitted!',
-        'Your Holy Orders application has been submitted successfully. We will contact you soon.',
+        '✅ Application Submitted!',
+        'Your Holy Orders application has been submitted successfully. We will contact you soon for further instructions.',
         [
           { 
             text: 'OK', 
@@ -101,34 +190,44 @@ const HolyOrdenForm = () => {
                 email: '',
                 contactNumber: ''
               });
+              setTouched({
+                name: false,
+                email: false,
+                contactNumber: false
+              });
               navigation.goBack();
             }
           }
         ]
       );
     } catch (error) {
-      console.error('Submission error:', error);
+      console.error('❌ Submission error:', error);
+      
+      let errorMessage = 'Cannot connect to server. Please check your connection and try again.';
+      
+      if (error.message.includes('Network request failed')) {
+        errorMessage = 'Network connection failed. Please check your internet connection.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Request timeout. Please try again.';
+      } else {
+        errorMessage = error.message;
+      }
+
       Alert.alert(
-        'Connection Error', 
-        'Cannot connect to server. Please check your connection and try again.'
+        'Submission Failed', 
+        errorMessage,
+        [{ text: 'OK' }]
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
+  const isFormValid = () => {
+    return formData.name.trim() && 
+           formData.email.trim() && 
+           formData.contactNumber.replace(/\s/g, '').length >= 11 &&
+           Object.keys(errors).length === 0;
   };
 
   return (
@@ -143,7 +242,20 @@ const HolyOrdenForm = () => {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (formData.name || formData.email || formData.contactNumber) {
+                Alert.alert(
+                  'Discard Changes?',
+                  'You have unsaved changes. Are you sure you want to go back?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Discard', onPress: () => navigation.goBack() }
+                  ]
+                );
+              } else {
+                navigation.goBack();
+              }
+            }}
           >
             <Icon name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
@@ -160,6 +272,7 @@ const HolyOrdenForm = () => {
           <ScrollView 
             contentContainerStyle={styles.scrollContainer}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <View style={styles.card}>
               {/* Form Header */}
@@ -169,7 +282,7 @@ const HolyOrdenForm = () => {
                 </View>
                 <Text style={styles.title}>Vocational Calling</Text>
                 <Text style={styles.subtitle}>
-                  Answer God's call to serve in priestly ministry
+                  Answer God's call to serve in priestly ministry. Fill out this form to begin your journey.
                 </Text>
               </View>
 
@@ -179,20 +292,31 @@ const HolyOrdenForm = () => {
                 <View style={styles.inputContainer}>
                   <View style={styles.labelContainer}>
                     <Icon name="person" size={20} color="#1a4d2a" style={styles.inputIcon} />
-                    <Text style={styles.label}>Full Name</Text>
+                    <Text style={styles.label}>Full Name *</Text>
                   </View>
                   <TextInput
                     style={[
                       styles.input,
-                      errors.name && styles.inputError
+                      errors.name && styles.inputError,
+                      touched.name && !errors.name && styles.inputSuccess
                     ]}
                     placeholder="Enter your full name"
                     placeholderTextColor="#999"
                     value={formData.name}
                     onChangeText={(text) => handleInputChange('name', text)}
+                    onBlur={() => handleInputBlur('name')}
+                    editable={!isSubmitting}
                   />
-                  {errors.name && (
-                    <Text style={styles.errorText}>{errors.name}</Text>
+                  {errors.name ? (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error-outline" size={16} color="#E74C3C" />
+                      <Text style={styles.errorText}>{errors.name}</Text>
+                    </View>
+                  ) : touched.name && formData.name && (
+                    <View style={styles.successContainer}>
+                      <Icon name="check-circle" size={16} color="#27AE60" />
+                      <Text style={styles.successText}>Name looks good</Text>
+                    </View>
                   )}
                 </View>
 
@@ -200,22 +324,33 @@ const HolyOrdenForm = () => {
                 <View style={styles.inputContainer}>
                   <View style={styles.labelContainer}>
                     <Icon name="email" size={20} color="#1a4d2a" style={styles.inputIcon} />
-                    <Text style={styles.label}>Email Address</Text>
+                    <Text style={styles.label}>Email Address *</Text>
                   </View>
                   <TextInput
                     style={[
                       styles.input,
-                      errors.email && styles.inputError
+                      errors.email && styles.inputError,
+                      touched.email && !errors.email && styles.inputSuccess
                     ]}
                     placeholder="Enter your email address"
                     placeholderTextColor="#999"
                     value={formData.email}
                     onChangeText={(text) => handleInputChange('email', text)}
+                    onBlur={() => handleInputBlur('email')}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    editable={!isSubmitting}
                   />
-                  {errors.email && (
-                    <Text style={styles.errorText}>{errors.email}</Text>
+                  {errors.email ? (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error-outline" size={16} color="#E74C3C" />
+                      <Text style={styles.errorText}>{errors.email}</Text>
+                    </View>
+                  ) : touched.email && formData.email && (
+                    <View style={styles.successContainer}>
+                      <Icon name="check-circle" size={16} color="#27AE60" />
+                      <Text style={styles.successText}>Valid email</Text>
+                    </View>
                   )}
                 </View>
 
@@ -223,39 +358,64 @@ const HolyOrdenForm = () => {
                 <View style={styles.inputContainer}>
                   <View style={styles.labelContainer}>
                     <Icon name="phone" size={20} color="#1a4d2a" style={styles.inputIcon} />
-                    <Text style={styles.label}>Contact Number</Text>
+                    <Text style={styles.label}>Contact Number *</Text>
                   </View>
                   <TextInput
                     style={[
                       styles.input,
-                      errors.contactNumber && styles.inputError
+                      errors.contactNumber && styles.inputError,
+                      touched.contactNumber && !errors.contactNumber && styles.inputSuccess
                     ]}
-                    placeholder="Enter your contact number"
+                    placeholder="09XX XXX XXXX"
                     placeholderTextColor="#999"
                     value={formData.contactNumber}
-                    onChangeText={(text) => handleInputChange('contactNumber', text)}
+                    onChangeText={handlePhoneChange}
+                    onBlur={() => handleInputBlur('contactNumber')}
                     keyboardType="phone-pad"
+                    maxLength={13} // 09XX XXX XXXX
+                    editable={!isSubmitting}
                   />
-                  {errors.contactNumber && (
-                    <Text style={styles.errorText}>{errors.contactNumber}</Text>
+                  {errors.contactNumber ? (
+                    <View style={styles.errorContainer}>
+                      <Icon name="error-outline" size={16} color="#E74C3C" />
+                      <Text style={styles.errorText}>{errors.contactNumber}</Text>
+                    </View>
+                  ) : touched.contactNumber && formData.contactNumber && (
+                    <View style={styles.successContainer}>
+                      <Icon name="check-circle" size={16} color="#27AE60" />
+                      <Text style={styles.successText}>Valid phone number</Text>
+                    </View>
                   )}
                 </View>
 
                 {/* Submit Button */}
                 <TouchableOpacity
-                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                  style={[
+                    styles.submitButton, 
+                    (!isFormValid() || isSubmitting) && styles.submitButtonDisabled
+                  ]}
                   onPress={handleSubmit}
-                  disabled={isSubmitting}
+                  disabled={!isFormValid() || isSubmitting}
                 >
                   {isSubmitting ? (
-                    <Text style={styles.submitButtonText}>Submitting...</Text>
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#FFF" />
+                      <Text style={styles.submitButtonText}>Submitting...</Text>
+                    </View>
                   ) : (
-                    <>
+                    <View style={styles.buttonContent}>
                       <Icon name="send" size={20} color="#FFF" />
                       <Text style={styles.submitButtonText}>Submit Application</Text>
-                    </>
+                    </View>
                   )}
                 </TouchableOpacity>
+
+                {/* Form Instructions */}
+                <View style={styles.instructions}>
+                  <Text style={styles.instructionsText}>
+                    * Required fields. After submission, you can track your application in the Schedule History section.
+                  </Text>
+                </View>
               </View>
 
               {/* Footer */}
@@ -395,10 +555,30 @@ const styles = StyleSheet.create({
     borderColor: '#E74C3C',
     backgroundColor: '#FDEDED',
   },
+  inputSuccess: {
+    borderColor: '#27AE60',
+    backgroundColor: '#F0F9F0',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    marginLeft: 4,
+  },
   errorText: {
     color: '#E74C3C',
     fontSize: 14,
+    marginLeft: 4,
+  },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 5,
+    marginLeft: 4,
+  },
+  successText: {
+    color: '#27AE60',
+    fontSize: 14,
     marginLeft: 4,
   },
   submitButton: {
@@ -422,11 +602,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#95d5b2',
     opacity: 0.7,
   },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   submitButtonText: {
     color: '#FFF',
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  instructions: {
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#1a4d2a',
+  },
+  instructionsText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   footer: {
     marginTop: 20,
@@ -443,4 +644,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HolyOrdenForm;
+export default HolyOrderForm;

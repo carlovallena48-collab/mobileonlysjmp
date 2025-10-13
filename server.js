@@ -360,6 +360,7 @@ app.put("/api/change-password/:email", async (req, res) => {
     res.status(500).json({ success: false, message: "Something went wrong." });
   }
 });
+
 // =======================
 // FORGOT PASSWORD REQUEST ROUTE - WITH VERIFICATION CODE
 // =======================
@@ -520,72 +521,6 @@ app.post("/api/verify-reset-code", async (req, res) => {
   }
 });
 
-// =======================
-// TEST EMAIL CONFIGURATION
-// =======================
-app.post("/api/test-email", async (req, res) => {
-  try {
-    console.log('🧪 Testing email configuration...');
-    console.log('📧 Email User:', process.env.EMAIL_USER);
-    
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // Test connection
-    await transporter.verify();
-    console.log('✅ Email server connection successful');
-
-    // Send test email
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER, // Send to yourself
-      subject: "✅ SJMP Parish App - Email Test Successful",
-      text: "Congratulations! Your email configuration is working correctly.",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1eb059ff;">✅ Email Test Successful!</h2>
-          <p>Your SJMP Parish App email configuration is working correctly.</p>
-          <p>You can now send password reset emails to your users.</p>
-          <br>
-          <p><strong>Server Time:</strong> ${new Date().toString()}</p>
-        </div>
-      `,
-    };
-
-    const result = await transporter.sendMail(mailOptions);
-    console.log('✅ Test email sent successfully!');
-    console.log('📧 Message ID:', result.messageId);
-
-    res.json({ 
-      success: true, 
-      message: "Test email sent successfully!",
-      messageId: result.messageId 
-    });
-
-  } catch (err) {
-    console.error('❌ EMAIL TEST ERROR:', err);
-    
-    let errorDetails = "Email test failed: ";
-    if (err.code === 'EAUTH') {
-      errorDetails += "Authentication failed. Check your email and app password.";
-    } else if (err.code === 'EENVELOPE') {
-      errorDetails += "Invalid email address.";
-    } else {
-      errorDetails += err.message;
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      error: errorDetails,
-      code: err.code 
-    });
-  }
-});
 // =======================
 // RESET PASSWORD ROUTE
 // =======================
@@ -921,7 +856,114 @@ app.get("/api/marriage_requests", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch Marriage requests." });
   }
 });
-// ✅ ADD THESE ROUTES TO YOUR SERVER (server.js)
+
+// =======================
+// FUNERAL SERVICE REQUEST ROUTES - NEWLY ADDED
+// =======================
+app.post("/api/funeral_requests", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    console.log('📥 Received Funeral Service request:', req.body);
+
+    // Basic validation
+    if (!req.body.nameOfDeceased || !req.body.birthday || !req.body.dateDied || 
+        !req.body.causeOfDeath || !req.body.informant || !req.body.relationship || 
+        !req.body.residence || !req.body.placeOfBurialCemetery || 
+        !req.body.scheduleDate || !req.body.scheduleTime || !req.body.contactNumber) {
+      return res.status(400).json({ 
+        message: "Please fill in all required fields." 
+      });
+    }
+
+    // CRITICAL: Make sure submittedByEmail is included
+    if (!req.body.submittedByEmail) {
+      return res.status(400).json({ 
+        message: "User email is required. Please login first." 
+      });
+    }
+
+    const funeralData = {
+      sacrament: "Funeral Service",
+      nameOfDeceased: req.body.nameOfDeceased,
+      birthday: req.body.birthday,
+      civilStatus: req.body.civilStatus || "",
+      nameOfHusbandOrWife: req.body.nameOfHusbandOrWife || "",
+      informant: req.body.informant,
+      relationship: req.body.relationship,
+      residence: req.body.residence,
+      dateDied: req.body.dateDied,
+      age: req.body.age || "",
+      causeOfDeath: req.body.causeOfDeath,
+      receivedLastSacrament: req.body.receivedLastSacrament || "No",
+      placeOfBurialCemetery: req.body.placeOfBurialCemetery,
+      scheduleDate: req.body.scheduleDate,
+      scheduleTime: req.body.scheduleTime,
+      contactNumber: req.body.contactNumber,
+      status: "pending",
+      submittedByEmail: req.body.submittedByEmail.trim().toLowerCase(),
+      createdAt: new Date(),
+      requestNumber: `FUNERAL-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      lastUpdated: new Date()
+    };
+
+    const result = await db.collection("funeralrequests").insertOne(funeralData);
+
+    console.log('✅ Funeral Service request saved:', funeralData.requestNumber);
+    console.log('👤 Submitted by:', funeralData.submittedByEmail);
+
+    res.status(201).json({ 
+      message: "Funeral Service request submitted successfully!", 
+      id: result.insertedId,
+      requestNumber: funeralData.requestNumber
+    });
+  } catch (err) {
+    console.error("Funeral Service request save error:", err);
+    res.status(500).json({ message: "Failed to submit Funeral Service request." });
+  }
+});
+
+app.get("/api/funeral_requests", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const requests = await db
+      .collection("funeralrequests")
+      .find()
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Fetch Funeral Service requests error:", err);
+    res.status(500).json({ message: "Failed to fetch Funeral Service requests." });
+  }
+});
+
+// Get Funeral Service requests by user email
+app.get("/api/funeral_requests/:email", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const { email } = req.params;
+    const userEmail = email.trim().toLowerCase();
+
+    console.log(`🔍 Fetching funeral requests for: ${userEmail}`);
+
+    const requests = await db
+      .collection("funeralrequests")
+      .find({ submittedByEmail: userEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    console.log(`✅ Found ${requests.length} funeral requests for ${userEmail}`);
+
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Fetch user Funeral Service requests error:", err);
+    res.status(500).json({ message: "Failed to fetch Funeral Service requests." });
+  }
+});
 
 // =======================
 // NOTIFICATION ROUTES
@@ -1098,6 +1140,7 @@ app.get("/api/baptismrequests/type/:type", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch baptism requests by type." });
   }
 });
+
 // =======================
 // FIRST COMMUNION ROUTES
 // =======================
@@ -1140,6 +1183,7 @@ app.get("/api/first_communion_requests", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch First Communion requests." });
   }
 });
+
 // =======================
 // HOLY ORDERS REQUEST ROUTES - UPDATED
 // =======================
@@ -1186,7 +1230,81 @@ app.post("/api/holy_orders_requests", async (req, res) => {
 });
 
 // =======================
-// PAMISA REQUEST ROUTES
+// BLESSING REQUEST ROUTES - FIXED (CRITICAL FIX)
+// =======================
+app.post("/api/blessing_requests", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    console.log('📥 Received Blessing request:', req.body);
+
+    // Basic validation
+    if (!req.body.name || !req.body.address || !req.body.contactNumber || !req.body.date || !req.body.time || !req.body.blessingType) {
+      return res.status(400).json({ 
+        message: "Name, address, contact number, date, time, and blessing type are required." 
+      });
+    }
+
+    // CRITICAL FIX: Make sure submittedByEmail is included
+    if (!req.body.submittedByEmail) {
+      return res.status(400).json({ 
+        message: "User email is required. Please login first." 
+      });
+    }
+
+    const blessingData = {
+      sacrament: "Blessing",
+      name: req.body.name,
+      blessingType: req.body.blessingType,
+      requestForDetails: req.body.requestForDetails || "",
+      address: req.body.address,
+      contactNumber: req.body.contactNumber,
+      date: req.body.date,
+      time: req.body.time,
+      displayDate: req.body.displayDate || req.body.date,
+      displayTime: req.body.displayTime || req.body.time,
+      status: "pending",
+      submittedByEmail: req.body.submittedByEmail.trim().toLowerCase(), // CRITICAL: Use the logged-in user's email
+      createdAt: new Date(),
+      requestNumber: `BLESS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      lastUpdated: new Date()
+    };
+
+    const result = await db.collection("blessingrequests").insertOne(blessingData);
+
+    console.log('✅ Blessing request saved:', blessingData.requestNumber);
+    console.log('👤 Submitted by:', blessingData.submittedByEmail);
+
+    res.status(201).json({ 
+      message: "Blessing request submitted successfully!", 
+      id: result.insertedId,
+      requestNumber: blessingData.requestNumber
+    });
+  } catch (err) {
+    console.error("Blessing request save error:", err);
+    res.status(500).json({ message: "Failed to submit Blessing request." });
+  }
+});
+
+app.get("/api/blessing_requests", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const requests = await db
+      .collection("blessingrequests")
+      .find()
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Fetch Blessing requests error:", err);
+    res.status(500).json({ message: "Failed to fetch Blessing requests." });
+  }
+});
+
+// =======================
+// PAMISA REQUEST ROUTES - FIXED (CRITICAL FIX)
 // =======================
 app.post("/api/pamisa_requests", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database not connected yet." });
@@ -1201,15 +1319,25 @@ app.post("/api/pamisa_requests", async (req, res) => {
       });
     }
 
+    // CRITICAL FIX: Make sure submittedByEmail is included
+    if (!req.body.submittedByEmail) {
+      return res.status(400).json({ 
+        message: "User email is required. Please login first." 
+      });
+    }
+
     const pamisaData = {
       sacrament: "Pamisa",
       intention: req.body.intention,
       names: req.body.names,
       date: req.body.date,
       time: req.body.time,
+      displayDate: req.body.displayDate || req.body.date,
+      displayTime: req.body.displayTime || req.body.time,
       massSponsor: req.body.massSponsor || "",
       donation: req.body.donation || "0",
       status: "pending",
+      submittedByEmail: req.body.submittedByEmail.trim().toLowerCase(), // CRITICAL: Use the logged-in user's email
       createdAt: new Date(),
       requestNumber: req.body.requestNumber || `MASS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       lastUpdated: new Date()
@@ -1218,6 +1346,7 @@ app.post("/api/pamisa_requests", async (req, res) => {
     const result = await db.collection("pamisarequests").insertOne(pamisaData);
 
     console.log('✅ Pamisa request saved:', pamisaData.requestNumber);
+    console.log('👤 Submitted by:', pamisaData.submittedByEmail);
 
     res.status(201).json({ 
       message: "Pamisa request submitted successfully!", 
@@ -1248,92 +1377,7 @@ app.get("/api/pamisa_requests", async (req, res) => {
 });
 
 // =======================
-// BLESSING REQUEST ROUTES
-// =======================
-app.post("/api/blessing_requests", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "Database not connected yet." });
-
-  try {
-    console.log('📥 Received Blessing request:', req.body);
-
-    // Basic validation
-    if (!req.body.name || !req.body.address || !req.body.contactNumber || !req.body.date || !req.body.time || !req.body.blessingType) {
-      return res.status(400).json({ 
-        message: "Name, address, contact number, date, time, and blessing type are required." 
-      });
-    }
-
-    const blessingData = {
-      sacrament: "Blessing",
-      name: req.body.name,
-      blessingType: req.body.blessingType,
-      requestForDetails: req.body.requestForDetails || "",
-      address: req.body.address,
-      contactNumber: req.body.contactNumber,
-      date: req.body.date,
-      time: req.body.time,
-      displayDate: req.body.date,
-      displayTime: req.body.time,
-      status: "pending",
-      createdAt: new Date(),
-      requestNumber: req.body.requestNumber || `BLESS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      lastUpdated: new Date(),
-      donationNote: "Cash donation to be given during the blessing ceremony"
-    };
-
-    const result = await db.collection("blessingrequests").insertOne(blessingData);
-
-    console.log('✅ Blessing request saved:', blessingData.requestNumber);
-
-    res.status(201).json({ 
-      message: "Blessing request submitted successfully!", 
-      id: result.insertedId,
-      requestNumber: blessingData.requestNumber
-    });
-  } catch (err) {
-    console.error("Blessing request save error:", err);
-    res.status(500).json({ message: "Failed to submit blessing request." });
-  }
-});
-
-app.get("/api/blessing_requests", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "Database not connected yet." });
-
-  try {
-    const requests = await db
-      .collection("blessingrequests")
-      .find()
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    res.status(200).json(requests);
-  } catch (err) {
-    console.error("Fetch Blessing requests error:", err);
-    res.status(500).json({ message: "Failed to fetch blessing requests." });
-  }
-});
-
-app.get("/api/blessing_requests/:contactNumber", async (req, res) => {
-  if (!db) return res.status(500).json({ message: "Database not connected yet." });
-
-  try {
-    const { contactNumber } = req.params;
-
-    const requests = await db
-      .collection("blessingrequests")
-      .find({ contactNumber: contactNumber })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    res.status(200).json(requests);
-  } catch (err) {
-    console.error("Fetch user Blessing requests error:", err);
-    res.status(500).json({ message: "Failed to fetch your blessing requests." });
-  }
-});
-
-// =======================
-// GET USER REQUESTS BY EMAIL FOR EACH SACRAMENT
+// GET USER REQUESTS BY EMAIL FOR EACH SACRAMENT - FIXED
 // =======================
 
 // For Kumpil - Get by user email
@@ -1378,7 +1422,7 @@ app.get("/api/marriage_requests/:email", async (req, res) => {
   }
 });
 
-// For Pamisa - Get by user email
+// For Pamisa - Get by user email - FIXED
 app.get("/api/pamisa_requests/:email", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database not connected yet." });
 
@@ -1386,16 +1430,20 @@ app.get("/api/pamisa_requests/:email", async (req, res) => {
     const { email } = req.params;
     const userEmail = email.trim().toLowerCase();
 
+    console.log(`🔍 Fetching pamisa requests for: ${userEmail}`);
+
     const requests = await db
       .collection("pamisarequests")
-      .find({ 
-        $or: [
-          { submittedByEmail: userEmail },
-          { email: userEmail }
-        ]
-      })
+      .find({ submittedByEmail: userEmail })
       .sort({ createdAt: -1 })
       .toArray();
+
+    console.log(`✅ Found ${requests.length} pamisa requests for ${userEmail}`);
+    
+    // Debug: Show what we found
+    requests.forEach((req, index) => {
+      console.log(`   ${index + 1}. Request: ${req.requestNumber}, Submitted by: ${req.submittedByEmail}`);
+    });
 
     res.status(200).json(requests);
   } catch (err) {
@@ -1404,7 +1452,7 @@ app.get("/api/pamisa_requests/:email", async (req, res) => {
   }
 });
 
-// For Blessing - Get by user email
+// For Blessing - Get by user email - FIXED
 app.get("/api/blessing_requests/:email", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database not connected yet." });
 
@@ -1412,16 +1460,20 @@ app.get("/api/blessing_requests/:email", async (req, res) => {
     const { email } = req.params;
     const userEmail = email.trim().toLowerCase();
 
+    console.log(`🔍 Fetching blessing requests for: ${userEmail}`);
+
     const requests = await db
       .collection("blessingrequests")
-      .find({ 
-        $or: [
-          { submittedByEmail: userEmail },
-          { email: userEmail }
-        ]
-      })
+      .find({ submittedByEmail: userEmail })
       .sort({ createdAt: -1 })
       .toArray();
+
+    console.log(`✅ Found ${requests.length} blessing requests for ${userEmail}`);
+    
+    // Debug: Show what we found
+    requests.forEach((req, index) => {
+      console.log(`   ${index + 1}. Request: ${req.requestNumber}, Submitted by: ${req.submittedByEmail}`);
+    });
 
     res.status(200).json(requests);
   } catch (err) {
@@ -1471,7 +1523,86 @@ app.get("/api/first_communion_requests/:email", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch First Communion requests." });
   }
 });
+// =======================
+// GET ALL USER REQUESTS (FOR HISTORY/DASHBOARD)
+// =======================
+app.get("/api/user_requests/:email", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
 
+  try {
+    const { email } = req.params;
+    const userEmail = email.trim().toLowerCase();
+
+    console.log(`📊 Getting all requests for user: ${userEmail}`);
+
+    // Get requests from ALL sacrament collections including funeral
+    const [
+      baptismRequests, 
+      kumpilRequests, 
+      marriageRequests, 
+      pamisaRequests, 
+      blessingRequests, 
+      holyOrdersRequests, 
+      firstCommunionRequests, 
+      funeralRequests  // ADD THIS
+    ] = await Promise.all([
+      db.collection("baptismrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("kumpilrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("marriagerequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("pamisarequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("blessingrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("holyordersrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("firstcommunionrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("funeralrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray() // ADD THIS LINE
+    ]);
+
+    // Combine all requests and sort by creation date
+    const allRequests = [
+      ...baptismRequests,
+      ...kumpilRequests,
+      ...marriageRequests,
+      ...pamisaRequests,
+      ...blessingRequests,
+      ...holyOrdersRequests,
+      ...firstCommunionRequests,
+      ...funeralRequests // ADD THIS LINE
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    console.log(`✅ Total requests found: ${allRequests.length}`);
+    console.log(`📋 Breakdown - Baptism: ${baptismRequests.length}, Funeral: ${funeralRequests.length}`);
+
+    res.status(200).json(allRequests);
+  } catch (err) {
+    console.error("Fetch all user requests error:", err);
+    res.status(500).json({ message: "Failed to fetch user requests." });
+  }
+});
+// =======================
+// GET FUNERAL REQUESTS BY USER EMAIL
+// =======================
+app.get("/api/funeral_requests/:email", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const { email } = req.params;
+    const userEmail = email.trim().toLowerCase();
+
+    console.log(`🔍 Fetching funeral requests for: ${userEmail}`);
+
+    const requests = await db
+      .collection("funeralrequests")
+      .find({ submittedByEmail: userEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    console.log(`✅ Found ${requests.length} funeral requests for ${userEmail}`);
+
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Fetch user Funeral Service requests error:", err);
+    res.status(500).json({ message: "Failed to fetch Funeral Service requests." });
+  }
+});
 // =======================
 // START SERVER
 // =======================

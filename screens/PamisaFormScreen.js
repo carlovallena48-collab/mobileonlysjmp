@@ -13,8 +13,10 @@ import {
   Modal
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
+const USER_STORAGE_KEY = '@userData';
 
 const PamisaFormScreen = () => {
   const [selectedIntention, setSelectedIntention] = useState('');
@@ -23,12 +25,31 @@ const PamisaFormScreen = () => {
   const [selectedTime, setSelectedTime] = useState(new Date());
   const [massSponsor, setMassSponsor] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
   
   // DateTime Picker States
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [dateInput, setDateInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
+
+  // Load user data on component mount
+  React.useEffect(() => {
+      const loadUserData = async () => {
+          try {
+              const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
+              if (userData) {
+                  const user = JSON.parse(userData);
+                  setUserEmail(user.email);
+                  console.log('👤 Current user for Pamisa:', user.email);
+              }
+          } catch (error) {
+              console.error('Error loading user data:', error);
+          }
+      };
+
+      loadUserData();
+  }, []);
 
   const intentions = [
     { id: 1, name: 'Thanksgiving', icon: '🙏', color: '#4CAF50' },
@@ -110,24 +131,34 @@ const PamisaFormScreen = () => {
       return;
     }
 
+    // Check if user is logged in
+    if (!userEmail) {
+      Alert.alert('Login Required', 'Please login first before submitting a mass request.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const datetime = formatDateTimeForSubmission();
       
       const formData = {
+        sacrament: "Pamisa",
         intention: selectedIntention,
         names: names.filter(name => name.trim() !== ''),
         date: datetime.date,
         time: datetime.time,
         displayDate: datetime.displayDate,
         displayTime: datetime.displayTime,
-        massSponsor: massSponsor || '',
-        donationNote: 'Cash donation to be given at parish office upon scheduling',
-        status: 'pending',
-        submittedAt: new Date().toISOString(),
+        massSponsor: massSponsor || "",
+        donation: "0",
+        status: "pending",
+        submittedByEmail: userEmail, // CRITICAL: Add user email
+        createdAt: new Date().toISOString(),
         requestNumber: `MASS-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
       };
+
+      console.log('📤 Submitting Pamisa request:', formData);
 
       const response = await fetch('http://10.173.231.17:5000/api/pamisa_requests', {
         method: 'POST',
@@ -229,6 +260,13 @@ const PamisaFormScreen = () => {
             <Text style={styles.subtitle}>Schedule Your Mass Intention</Text>
           </View>
 
+          {/* User Info */}
+          {userEmail && (
+            <View style={styles.userInfo}>
+              <Text style={styles.userInfoText}>Submitting as: {userEmail}</Text>
+            </View>
+          )}
+
           {/* Intention Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mass Intention</Text>
@@ -288,7 +326,6 @@ const PamisaFormScreen = () => {
                   <Text style={[styles.dateTimeText, !dateInput && styles.placeholderText]}>
                     {dateInput || 'Select Date'}
                   </Text>
-                
                 </TouchableOpacity>
               </View>
               
@@ -303,7 +340,6 @@ const PamisaFormScreen = () => {
                   <Text style={[styles.dateTimeText, !timeInput && styles.placeholderText]}>
                     {timeInput || 'Select Time'}
                   </Text>
-                  
                 </TouchableOpacity>
               </View>
             </View>
@@ -332,7 +368,6 @@ const PamisaFormScreen = () => {
                 <Text style={styles.donationDescription}>
                   Cash donations will be collected at the parish office when your mass schedule is confirmed.
                 </Text>
-               
               </View>
             </View>
           </View>
@@ -486,6 +521,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#667eea',
     borderRadius: 2,
   },
+  userInfo: {
+    backgroundColor: '#e3f2fd',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  userInfoText: {
+    fontSize: 12,
+    color: '#1976d2',
+    fontWeight: '500',
+  },
   section: {
     marginBottom: 30,
   },
@@ -620,12 +667,6 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#999',
   },
-  calendarIcon: {
-    fontSize: 18,
-  },
-  clockIcon: {
-    fontSize: 18,
-  },
   donationInfoCard: {
     backgroundColor: '#f0f7ff',
     borderLeftWidth: 4,
@@ -654,11 +695,6 @@ const styles = StyleSheet.create({
     color: '#495057',
     lineHeight: 18,
     marginBottom: 6,
-  },
-  donationNote: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
   },
   submitButton: {
     backgroundColor: '#667eea',
