@@ -51,7 +51,7 @@ export default function ResetPasswordScreen() {
         setLoading(true);
         try {
             console.log('📤 Resetting password...');
-            const response = await axios.post(`http://10.173.231.17:5000/api/reset-password/${token}`, {
+            const response = await axios.post(`http://10.69.226.17:5000/api/reset-password/${token}`, {
                 newPassword: newPassword,
             });
 

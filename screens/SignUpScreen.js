@@ -41,7 +41,7 @@ export default function SignUpScreen({ navigation }) {
         setLoading(true);
         try {
             const response = await axios.post(
-                'http://10.173.231.17:5000/api/signup',
+                'http://10.69.226.17:5000/api/signup',
                 { fullName, email, password, address, contact, role: "Member" }
             );
             Alert.alert('Success', response.data.message);

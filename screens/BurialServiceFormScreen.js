@@ -137,7 +137,7 @@ const FuneralFormScreen = () => {
       console.log('📤 Submitting Funeral Service request:', submissionData);
 
       // Replace with your actual API endpoint
-      const response = await fetch('http://10.173.231.17:5000/api/funeral_requests', {
+      const response = await fetch('http://10.69.226.17:5000/api/funeral_requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

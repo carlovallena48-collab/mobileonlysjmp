@@ -24,7 +24,7 @@ const BACKGROUND_COLOR = "#f0fdfa";
 const CARD_BACKGROUND = "#ffffff";
 
 // API URL
-const API_URL = "http://10.173.231.17:5000/api";
+const API_URL = "http://10.69.226.17:5000/api";
 const USER_STORAGE_KEY = '@userData';
 
 // Enhanced Status Badge with Payment Status

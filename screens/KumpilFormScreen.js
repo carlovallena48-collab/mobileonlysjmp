@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
-const API_URL = "http://10.173.231.17:5000/api/kumpil_requests"; 
+const API_URL = "http://10.69.226.17:5000/api/kumpil_requests"; 
 
 const Colors = {
   churchGreenPrimary: '#2E7D32',

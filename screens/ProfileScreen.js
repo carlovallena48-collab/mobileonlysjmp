@@ -141,7 +141,7 @@ const ProfileScreen = () => {
     
     const navigation = useNavigation();
     
-    const API_BASE_URL = `http://10.173.231.17:5000`; 
+    const API_BASE_URL = `http://10.69.226.17:5000`; 
     const PROFILE_IMAGE_DEFAULT = "https://i.ibb.co/L95zB7X/emojiprofile.png";
     const ASYNC_IMAGE_KEY_PREFIX = "@user_profile_image_";
     

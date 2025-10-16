@@ -20,7 +20,7 @@ const C = {
     successGreen: '#4CAF50', warningOrange: '#FF9800',
 };
 
-const API_BASE_URL = 'http://10.173.231.17:5000'; // Your server IP
+const API_BASE_URL = 'http://10.69.226.17:5000'; // Your server IP
 
 // Main MarriageForm Component
 export default function MarriageForm({ navigation, route }) {

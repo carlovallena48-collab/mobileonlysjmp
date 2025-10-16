@@ -22,7 +22,7 @@ const SECONDARY_COLOR = '#34d399';
 const BACKGROUND_COLOR = '#f0fdfa';
 const CARD_BACKGROUND = '#ffffff';
 
-const API_URL = "http://10.173.231.17:5000/api";
+const API_URL = "http://10.69.226.17:5000/api";
 
 const ViewCertificateScreen = ({ navigation, route }) => {
   const userEmail = route.params?.userEmail || "guest@example.com";
