@@ -24,7 +24,7 @@ const BACKGROUND_COLOR = "#f0fdfa";
 const CARD_BACKGROUND = "#ffffff";
 
 // API URL
-const API_URL = "http://10.69.226.17:5000/api";
+const API_URL = "http://192.168.100.199:5000/api";
 const USER_STORAGE_KEY = '@userData';
 
 // Enhanced Status Badge with Payment Status
@@ -85,7 +85,9 @@ const ReasonModal = ({ visible, onClose, reason, type }) => (
     <View style={styles.modalContainer}>
       <View style={styles.modalContent}>
         <Text style={styles.modalTitle}>
-          {type === 'rejected' ? 'Rejection Reason' : 'Cancellation Reason'}
+          {type === 'rejected' ? 'Rejection Reason' : 
+           type === 'cancelled' ? 'Cancellation Reason' : 
+           'Reason'}
         </Text>
         <ScrollView style={styles.reasonScroll}>
           <Text style={styles.reasonText}>
@@ -211,9 +213,83 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     }
   };
 
+  // ENHANCED REASON EXTRACTION - ULTRA COMPREHENSIVE VERSION
+  const extractReasons = (data) => {
+    console.log(`🔍 [REASON DEBUG] Extracting reasons from data:`, {
+      status: data.status,
+      hasRejectionReason: !!data.rejectionReason,
+      hasCancellationReason: !!data.cancellationReason,
+      hasAdminNotes: !!data.adminNotes,
+      hasRemarks: !!data.remarks
+    });
+    
+    // Check ALL possible field names for rejection reasons
+    const rejectionReason = 
+      data.rejectionReason || 
+      data.reason || 
+      data.adminNotes || 
+      data.remarks ||
+      data.rejectionNotes ||
+      data.rejection_message ||
+      data.rejection_note ||
+      data.rejection_reason ||
+      data.rejected_reason ||
+      data.cancel_reason || // Sometimes used for both
+      data.notes || // General notes field
+      data.admin_notes ||
+      data.status_reason ||
+      data.rejection_notes ||
+      data.rejectionMessage ||
+      '';
+    
+    // Check ALL possible field names for cancellation reasons  
+    const cancellationReason = 
+      data.cancellationReason ||
+      data.cancelReason || 
+      data.cancel_reason ||
+      data.cancelled_reason ||
+      data.cancellation_reason ||
+      data.cancellation_notes ||
+      data.cancel_notes ||
+      data.cancellationMessage ||
+      data.reason || // Fallback to general reason
+      data.adminNotes || // Fallback to admin notes
+      data.remarks || // Fallback to remarks
+      '';
+
+    // Additional admin notes from any field
+    const adminNotes = 
+      data.adminNotes ||
+      data.remarks ||
+      data.notes ||
+      data.admin_notes ||
+      data.additional_notes ||
+      data.comments ||
+      '';
+
+    console.log(`📝 [REASON DEBUG] Extracted reasons:`, {
+      rejectionReason: rejectionReason.substring(0, 50) + (rejectionReason.length > 50 ? '...' : ''),
+      cancellationReason: cancellationReason.substring(0, 50) + (cancellationReason.length > 50 ? '...' : ''),
+      adminNotes: adminNotes.substring(0, 50) + (adminNotes.length > 50 ? '...' : ''),
+      hasRejection: !!rejectionReason,
+      hasCancellation: !!cancellationReason,
+      hasAdminNotes: !!adminNotes,
+      status: data.status
+    });
+    
+    return { 
+      rejectionReason, 
+      cancellationReason, 
+      adminNotes 
+    };
+  };
+
   // ENHANCED function to get sacrament-specific details - COMPLETELY REWRITTEN
   const getSacramentDetails = (sacrament, data) => {
     console.log(`🔍 Processing ${sacrament} data:`, data);
+
+    // CRITICAL FIX: Use comprehensive reason extraction
+    const { rejectionReason, cancellationReason, adminNotes } = extractReasons(data);
 
     const baseDetails = {
       name: 'Not specified',
@@ -221,13 +297,15 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
       time: 'Time not set',
       details: `${sacrament} request`,
       paymentStatus: data.paymentStatus || 'unpaid',
-      rejectionReason: data.rejectionReason || data.reason || '',
-      cancellationReason: data.cancellationReason || data.reason || '',
-      adminNotes: data.adminNotes || '',
+      rejectionReason: rejectionReason,
+      cancellationReason: cancellationReason,
+      adminNotes: adminNotes,
       amount: data.amount || data.fee || data.donation || '0',
       paymentDate: data.paymentDate ? formatDate(data.paymentDate) : null,
       submittedDate: formatDate(data.createdAt || data.submittedDate || data.requestDate),
       status: data.status || 'pending',
+      // Include raw data for debugging
+      rawData: data
     };
 
     switch (sacrament) {
@@ -361,9 +439,24 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
 
   // Function to show reason modal
   const showReasonModal = (reason, type) => {
+    console.log(`📱 Showing ${type} reason modal:`, reason);
     setSelectedReason(reason);
     setSelectedType(type);
     setModalVisible(true);
+  };
+
+  // DEBUG FUNCTION - Check why reasons aren't showing
+  const debugReasons = (item) => {
+    console.log(`🐛 [DEBUG REASONS] for ${item.sacrament}:`, {
+      status: item.status,
+      rejectionReason: item.rejectionReason,
+      cancellationReason: item.cancellationReason,
+      adminNotes: item.adminNotes,
+      hasRejection: !!item.rejectionReason,
+      hasCancellation: !!item.cancellationReason,
+      hasAdminNotes: !!item.adminNotes,
+      rawData: item.rawData // Check the raw data from backend
+    });
   };
 
   // CRITICAL FIX: Enhanced function to verify request belongs to current user
@@ -458,6 +551,19 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
       console.log(`📊 REQUEST SUMMARY:`);
       console.log(`   ✅ Successful fetches: ${successfulFetches}/${endpoints.length}`);
       console.log(`   🎯 Final user requests: ${allData.length}`);
+
+      // DEBUG: Check for rejected/cancelled requests and their reasons
+      const rejectedRequests = allData.filter(item => 
+        item.status === 'rejected' || item.status === 'cancelled' || item.status === 'canceled'
+      );
+      
+      console.log(`🚨 REJECTED/CANCELLED REQUESTS FOUND: ${rejectedRequests.length}`);
+      rejectedRequests.forEach((item, index) => {
+        console.log(`   ${index + 1}. ${item.sacrament} - ${item.status}`);
+        console.log(`      Rejection Reason: ${item.rejectionReason}`);
+        console.log(`      Cancellation Reason: ${item.cancellationReason}`);
+        console.log(`      Admin Notes: ${item.adminNotes}`);
+      });
 
       // Sort by date (newest first)
       allData.sort((a, b) => {
@@ -664,6 +770,70 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
     ));
   };
 
+  // ENHANCED: Function to render reason buttons for ALL sacrament forms
+  const renderReasonButtons = (item) => {
+    const reasonButtons = [];
+
+    // DEBUG: Log reasons for rejected/cancelled items
+    if (item.status === 'rejected' || item.status === 'cancelled' || item.status === 'canceled') {
+      console.log(`🔍 [REASON CHECK] ${item.sacrament} - Status: ${item.status}`);
+      debugReasons(item);
+    }
+
+    // Show rejection reason for ALL rejected requests
+    if ((item.status === 'rejected' || item.status === 'canceled' || item.status === 'cancelled') && item.rejectionReason) {
+      reasonButtons.push(
+        <TouchableOpacity 
+          key="rejection"
+          style={styles.reasonButton}
+          onPress={() => showReasonModal(item.rejectionReason, 'rejected')}
+        >
+          <Ionicons name="warning-outline" size={16} color="#ef4444" />
+          <Text style={styles.reasonButtonText}>View Rejection Reason</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // Show cancellation reason for ALL cancelled requests
+    if ((item.status === 'cancelled' || item.status === 'canceled') && item.cancellationReason) {
+      reasonButtons.push(
+        <TouchableOpacity 
+          key="cancellation"
+          style={styles.reasonButton}
+          onPress={() => showReasonModal(item.cancellationReason, 'cancelled')}
+        >
+          <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
+          <Text style={styles.reasonButtonText}>View Cancellation Reason</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // Show admin notes if available for ANY sacrament form
+    if (item.adminNotes) {
+      reasonButtons.push(
+        <View key="adminNotes" style={styles.adminNotesContainer}>
+          <Ionicons name="document-text-outline" size={16} color="#3b82f6" />
+          <Text style={styles.adminNotesText}>Admin Notes: {item.adminNotes}</Text>
+        </View>
+      );
+    }
+
+    // If status is rejected/cancelled but no specific reason found, show a generic message
+    if ((item.status === 'rejected' || item.status === 'cancelled' || item.status === 'canceled') && 
+        !item.rejectionReason && !item.cancellationReason && !item.adminNotes) {
+      reasonButtons.push(
+        <View key="noReason" style={styles.noReasonContainer}>
+          <Ionicons name="information-circle-outline" size={16} color="#6b7280" />
+          <Text style={styles.noReasonText}>
+            No specific reason provided for {item.status} status.
+          </Text>
+        </View>
+      );
+    }
+
+    return reasonButtons;
+  };
+
   const renderItemCard = (item, index) => {
     const isHolyOrders = item.sacrament === 'Holy Orders';
     const isFuneralService = item.sacrament === 'Funeral Service';
@@ -728,34 +898,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           <Text style={styles.detailText}>Submitted: {item.submittedDate}</Text>
         </View>
 
-        {/* Show rejection/cancellation reason if available */}
-        {(item.status === 'rejected' && item.rejectionReason) && (
-          <TouchableOpacity 
-            style={styles.reasonButton}
-            onPress={() => showReasonModal(item.rejectionReason, 'rejected')}
-          >
-            <Ionicons name="warning-outline" size={16} color="#ef4444" />
-            <Text style={styles.reasonButtonText}>View Rejection Reason</Text>
-          </TouchableOpacity>
-        )}
-
-        {(item.status === 'cancelled' && item.cancellationReason) && (
-          <TouchableOpacity 
-            style={styles.reasonButton}
-            onPress={() => showReasonModal(item.cancellationReason, 'cancelled')}
-          >
-            <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
-            <Text style={styles.reasonButtonText}>View Cancellation Reason</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Show admin notes if available */}
-        {item.adminNotes && (
-          <View style={styles.adminNotesContainer}>
-            <Ionicons name="document-text-outline" size={16} color="#3b82f6" />
-            <Text style={styles.adminNotesText}>Admin Notes: {item.adminNotes}</Text>
-          </View>
-        )}
+        {/* CRITICAL FIX: Show rejection/cancellation reasons for ALL sacrament forms */}
+        {renderReasonButtons(item)}
 
         {/* Special note for Holy Orders */}
         {isHolyOrders && (
@@ -1089,6 +1233,23 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     flex: 1,
     lineHeight: 16,
+  },
+  noReasonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  noReasonText: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 6,
+    fontStyle: 'italic',
   },
   specialNote: {
     flexDirection: 'row',

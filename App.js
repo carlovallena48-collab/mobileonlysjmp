@@ -30,6 +30,11 @@ import HolyOrdenFormScreen from "./screens/HolyOrdenFormScreen";
 import KumpisalFormScreen from "./screens/KumpisalFormScreen";
 import BurialServiceFormScreen from "./screens/BurialServiceFormScreen";
 import ViewCertificateScreen from "./screens/ViewCertificateScreen";
+import VolunteerFormScreen from "./screens/VolunteerFormScreen";
+import VolunteerHistoryScreen from "./screens/VolunteerHistoryScreen";
+
+
+
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -66,6 +71,15 @@ export default function App() {
         <Stack.Screen name="KumpisalForm" component={KumpisalFormScreen} />
        <Stack.Screen name="BurialServiceForm" component={BurialServiceFormScreen} />
        <Stack.Screen name="ViewRequestCertificate" component={ViewCertificateScreen} />
+       <Stack.Screen 
+  name="VolunteerFormScreen" 
+  component={VolunteerFormScreen}
+  options={{
+    headerShown: false,
+    presentation: 'card'
+  }}
+/>
+<Stack.Screen name="VolunteerHistory" component={VolunteerHistoryScreen} />
    </Stack.Navigator>
  </NavigationContainer>
   );

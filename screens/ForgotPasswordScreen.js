@@ -44,7 +44,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         setLoading(true);
         try {
             console.log('📤 Sending verification code...');
-            const response = await axios.post('http://10.69.226.17:5000/api/forgot-password', {
+            const response = await axios.post('http://192.168.100.199:5000/api/forgot-password', {
                 email: email.trim().toLowerCase(),
             });
 
@@ -104,7 +104,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         setLoading(true);
         try {
             console.log('🔐 Verifying code...');
-            const response = await axios.post('http://10.69.226.17:5000/api/verify-reset-code', {
+            const response = await axios.post('http://192.168.100.199:5000/api/verify-reset-code', {
                 email: userEmail,
                 code: verificationCodeToVerify,
             });
@@ -140,7 +140,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     const handleResendCode = async () => {
         setLoading(true);
         try {
-            await axios.post('http://10.69.226.17:5000/api/forgot-password', {
+            await axios.post('http://192.168.100.199:5000/api/forgot-password', {
                 email: userEmail,
             });
             Alert.alert('Success', 'New verification code sent!');

@@ -11,7 +11,7 @@ import { Calendar } from 'react-native-calendars';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 const { width, height } = Dimensions.get('window');
-const API_URL = "http://10.69.226.17:5000/api/baptismrequests";
+const API_URL = "http://192.168.100.199:5000/api/baptismrequests";
 const USER_STORAGE_KEY = '@userData';
 const NOTIFICATION_STORAGE_KEY = '@notificationHistory';
 

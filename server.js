@@ -1751,67 +1751,46 @@ app.get("/api/funeral_requests/:email", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch Funeral Service requests." });
   }
 });
+// =======================
+// CERTIFICATE REQUEST ROUTES - VERIFY THESE EXIST
+// =======================
 
-// =============================================
-// CERTIFICATE REQUEST ROUTES - MONGODB VERSION
-// =============================================
-
-// Create certificate_requests collection if not exists
-app.get('/api/init-certificate-collection', async (req, res) => {
+// Get certificate requests by user email - CRITICAL FIX
+app.get('/api/certificate-requests/user/:email', async (req, res) => {
   try {
-    // Check if collection exists, if not it will be created automatically
-    const collections = await db.listCollections({ name: "certificaterequests" }).toArray();
-    
-    if (collections.length === 0) {
-      console.log('📁 Creating certificaterequests collection...');
-      await db.createCollection("certificaterequests");
-      
-      // Insert sample data
-      const sampleData = [
-        {
-          certificateType: "Baptismal Certificate",
-          fullName: "Maria Santos Cruz",
-          dateOfSacrament: "2010-05-15",
-          purpose: "School Requirements",
-          contactNumber: "09123456789",
-          address: "123 Main St, Manila",
-          requestedCopies: 2,
-          status: "Completed",
-          certificateNumber: "BAP-2024-00123",
-          requestDate: new Date().toISOString().split('T')[0],
-          scheduledDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          createdAt: new Date(),
-          updatedAt: new Date()
-        },
-        {
-          certificateType: "Marriage Certificate",
-          fullName: "Juan and Maria Dela Cruz",
-          dateOfSacrament: "2015-06-20",
-          purpose: "Legal Documentation",
-          contactNumber: "09123456790",
-          address: "456 Oak St, Quezon City",
-          requestedCopies: 1,
-          status: "In Progress",
-          certificateNumber: "MAR-2024-00045",
-          requestDate: new Date().toISOString().split('T')[0],
-          scheduledDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      ];
-      
-      await db.collection("certificaterequests").insertMany(sampleData);
-      console.log('✅ Sample certificate data inserted');
-    }
-    
-    res.json({ success: true, message: "Certificate collection initialized" });
+    const { email } = req.params;
+    const userEmail = email.trim().toLowerCase();
+
+    console.log(`🔍 [BACKEND] Fetching certificate requests for user: ${userEmail}`);
+
+    // CRITICAL: Make sure we're filtering by submittedByEmail
+    const requests = await db.collection("certificaterequests")
+      .find({ submittedByEmail: userEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    console.log(`✅ [BACKEND] Found ${requests.length} certificate requests for ${userEmail}`);
+
+    // Debug: Show what we found
+    requests.forEach((req, index) => {
+      console.log(`   ${index + 1}. ${req.certificateType} - ${req.certificateNumber}`);
+      console.log(`      Submitted by: ${req.submittedByEmail}`);
+    });
+
+    res.json({
+      success: true,
+      data: requests
+    });
   } catch (error) {
-    console.error('Error initializing certificate collection:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('❌ [BACKEND] Error fetching user certificate requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching certificate requests: ' + error.message
+    });
   }
 });
 
-// Submit certificate request
+// Submit certificate request - ENHANCED VERSION
 app.post('/api/certificate-requests', async (req, res) => {
   try {
     const {
@@ -1822,17 +1801,24 @@ app.post('/api/certificate-requests', async (req, res) => {
       contactNumber,
       address,
       requestedCopies = 1,
-      status = 'Pending',
-      submittedByEmail
+      submittedByEmail // CRITICAL: Make sure this is included
     } = req.body;
 
-    console.log('📥 Received certificate request:', req.body);
+    console.log('📥 [BACKEND] Received certificate request:', req.body);
 
     // Validation
     if (!certificateType || !fullName || !purpose) {
       return res.status(400).json({
         success: false,
         message: 'Certificate type, full name, and purpose are required'
+      });
+    }
+
+    // CRITICAL: Make sure submittedByEmail is provided
+    if (!submittedByEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'User email is required'
       });
     }
 
@@ -1864,19 +1850,21 @@ app.post('/api/certificate-requests', async (req, res) => {
       contactNumber: contactNumber || '',
       address: address || '',
       requestedCopies: parseInt(requestedCopies) || 1,
-      status,
+      status: 'Pending', // CRITICAL: Set initial status
       certificateNumber,
-      submittedByEmail: submittedByEmail || null,
+      submittedByEmail: submittedByEmail.trim().toLowerCase(), // CRITICAL: Use the logged-in user's email
       requestDate: new Date().toISOString().split('T')[0],
       scheduledDate: scheduledDate.toISOString().split('T')[0],
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
+    console.log('💾 [BACKEND] Saving certificate data:', certificateData);
+
     // Insert into MongoDB
     const result = await db.collection("certificaterequests").insertOne(certificateData);
 
-    console.log('✅ Certificate request saved:', certificateNumber);
+    console.log('✅ [BACKEND] Certificate request saved:', certificateNumber);
 
     res.status(201).json({
       success: true,
@@ -1887,7 +1875,7 @@ app.post('/api/certificate-requests', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error submitting certificate request:', error);
+    console.error('❌ [BACKEND] Error submitting certificate request:', error);
     res.status(500).json({
       success: false,
       message: 'Error submitting certificate request: ' + error.message
@@ -1895,223 +1883,469 @@ app.post('/api/certificate-requests', async (req, res) => {
   }
 });
 
-// Get all certificate requests
-app.get('/api/certificate-requests', async (req, res) => {
+// =======================
+// VOLUNTEER APPLICATION ROUTES - CRITICAL FIX: USE submittedByEmail FOR FILTERING
+// =======================
+
+// Submit volunteer application - ENHANCED VERSION
+app.post("/api/volunteer-applications", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
   try {
-    console.log('📋 Fetching all certificate requests');
-    
-    const requests = await db.collection("certificaterequests")
+    console.log('📥 Received volunteer application:', req.body);
+
+    // Basic validation
+    if (!req.body.ministry || !req.body.fullName || !req.body.email || !req.body.contactNumber) {
+      return res.status(400).json({ 
+        message: "Ministry, full name, email, and contact number are required." 
+      });
+    }
+
+    // CRITICAL: Make sure submittedByEmail is included (logged-in user's email)
+    if (!req.body.submittedByEmail) {
+      return res.status(400).json({ 
+        message: "User authentication required. Please login first." 
+      });
+    }
+
+    const volunteerData = {
+      ministry: req.body.ministry,
+      fullName: req.body.fullName,
+      email: req.body.email, // This can be any email user enters in form
+      contactNumber: req.body.contactNumber,
+      // CRITICAL: Use the logged-in user's email for tracking ownership
+      submittedByEmail: req.body.submittedByEmail.trim().toLowerCase(),
+      status: "pending",
+      applicationDate: new Date(req.body.applicationDate) || new Date(),
+      requestNumber: req.body.requestNumber || `VOL-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      createdAt: new Date(),
+      lastUpdated: new Date(),
+      // Additional fields for tracking
+      processedBy: null,
+      processedDate: null,
+      notes: "",
+      requirements: {
+        orientation: false,
+        training: false,
+        documents: false
+      }
+    };
+
+    const result = await db.collection("volunteerapplications").insertOne(volunteerData);
+
+    console.log('✅ Volunteer application saved:', volunteerData.requestNumber);
+    console.log('👤 Submitted by (logged-in user):', volunteerData.submittedByEmail);
+    console.log('📧 Form email (can be different):', volunteerData.email);
+
+    res.status(201).json({ 
+      message: "Volunteer application submitted successfully!", 
+      id: result.insertedId,
+      requestNumber: volunteerData.requestNumber
+    });
+  } catch (err) {
+    console.error("Volunteer application save error:", err);
+    res.status(500).json({ message: "Failed to submit volunteer application." });
+  }
+});
+
+// Get all volunteer applications (for admin)
+app.get("/api/volunteer-applications", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const applications = await db
+      .collection("volunteerapplications")
       .find()
       .sort({ createdAt: -1 })
       .toArray();
 
-    console.log(`✅ Found ${requests.length} certificate requests`);
-
-    res.json({
-      success: true,
-      data: requests
-    });
-  } catch (error) {
-    console.error('Error fetching certificate requests:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching certificate requests: ' + error.message
-    });
+    res.status(200).json(applications);
+  } catch (err) {
+    console.error("Fetch volunteer applications error:", err);
+    res.status(500).json({ message: "Failed to fetch volunteer applications." });
   }
 });
 
-// Get certificate requests by user email
-app.get('/api/certificate-requests/user/:email', async (req, res) => {
+// Get volunteer applications by user email - CRITICAL FIX: Use submittedByEmail for filtering
+app.get("/api/volunteer-applications/:email", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
   try {
     const { email } = req.params;
     const userEmail = email.trim().toLowerCase();
 
-    console.log(`🔍 Fetching certificate requests for user: ${userEmail}`);
-
-    const requests = await db.collection("certificaterequests")
+    console.log(`🔍 [VOLUNTEER HISTORY] Fetching applications for logged-in user: ${userEmail}`);
+    
+    // CRITICAL FIX: Filter by submittedByEmail (logged-in user's email) NOT by form email
+    const applications = await db
+      .collection("volunteerapplications")
       .find({ submittedByEmail: userEmail })
       .sort({ createdAt: -1 })
       .toArray();
 
-    console.log(`✅ Found ${requests.length} certificate requests for ${userEmail}`);
+    console.log(`✅ [VOLUNTEER HISTORY] Found ${applications.length} applications submitted by ${userEmail}`);
+    
+    // Debug output to verify filtering is working correctly
+    applications.forEach((app, index) => {
+      console.log(`   ${index + 1}. ${app.requestNumber} - ${app.ministry}`);
+      console.log(`      Submitted by: ${app.submittedByEmail}, Form email: ${app.email}`);
+    });
 
-    res.json({
-      success: true,
-      data: requests
-    });
-  } catch (error) {
-    console.error('Error fetching user certificate requests:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching certificate requests: ' + error.message
-    });
+    res.status(200).json(applications);
+  } catch (err) {
+    console.error("❌ [VOLUNTEER HISTORY] Fetch user volunteer applications error:", err);
+    res.status(500).json({ message: "Failed to fetch volunteer applications." });
   }
 });
 
-// Get certificate request by ID
-app.get('/api/certificate-requests/:id', async (req, res) => {
+// Update volunteer application status (for admin)
+app.put("/api/volunteer-applications/:id/status", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
   try {
     const { id } = req.params;
-    
-    console.log(`🔍 Fetching certificate request: ${id}`);
+    const { status, notes, processedBy } = req.body;
 
-    const request = await db.collection("certificaterequests").findOne({
-      _id: new ObjectId(id)
-    });
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
+    };
 
-    if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: 'Certificate request not found'
-      });
+    if (notes) updateData.notes = notes;
+    if (processedBy) updateData.processedBy = processedBy;
+    if (status === "approved" || status === "rejected") {
+      updateData.processedDate = new Date();
     }
 
-    res.json({
-      success: true,
-      data: request
+    const result = await db.collection("volunteerapplications").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Volunteer application not found." });
+    }
+
+    res.status(200).json({ 
+      message: `Volunteer application ${status} successfully!`,
+      status: status 
     });
-  } catch (error) {
-    console.error('Error fetching certificate request:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching certificate request: ' + error.message
-    });
+  } catch (err) {
+    console.error("Update volunteer application status error:", err);
+    res.status(500).json({ message: "Failed to update volunteer application status." });
   }
 });
 
-// Update certificate request status
-app.put('/api/certificate-requests/:id/status', async (req, res) => {
+// Update volunteer requirements status
+app.put("/api/volunteer-applications/:id/requirements", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
   try {
     const { id } = req.params;
-    const { status } = req.body;
-    
-    const validStatuses = ['Pending', 'In Progress', 'Completed'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid status'
-      });
-    }
+    const { requirements } = req.body;
 
-    console.log(`🔄 Updating certificate status: ${id} to ${status}`);
-
-    const result = await db.collection("certificaterequests").updateOne(
+    const result = await db.collection("volunteerapplications").updateOne(
       { _id: new ObjectId(id) },
       { 
         $set: { 
-          status: status,
-          updatedAt: new Date()
+          requirements: requirements,
+          lastUpdated: new Date()
         } 
       }
     );
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Certificate request not found'
-      });
+      return res.status(404).json({ message: "Volunteer application not found." });
     }
 
-    res.json({
-      success: true,
-      message: 'Certificate request status updated successfully'
+    res.status(200).json({ 
+      message: "Requirements status updated successfully!",
+      requirements: requirements
     });
-  } catch (error) {
-    console.error('Error updating certificate request:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating certificate request: ' + error.message
-    });
+  } catch (err) {
+    console.error("Update volunteer requirements error:", err);
+    res.status(500).json({ message: "Failed to update requirements status." });
   }
 });
 
-// Delete certificate request
-app.delete('/api/certificate-requests/:id', async (req, res) => {
+// Get volunteer statistics
+app.get("/api/volunteer-stats", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
   try {
-    const { id } = req.params;
-    
-    console.log(`🗑️ Deleting certificate request: ${id}`);
+    const totalApplications = await db.collection("volunteerapplications").countDocuments();
+    const pendingApplications = await db.collection("volunteerapplications").countDocuments({ status: "pending" });
+    const approvedApplications = await db.collection("volunteerapplications").countDocuments({ status: "approved" });
+    const rejectedApplications = await db.collection("volunteerapplications").countDocuments({ status: "rejected" });
 
-    const result = await db.collection("certificaterequests").deleteOne({
-      _id: new ObjectId(id)
-    });
+    // Get applications by ministry
+    const ministryStats = await db.collection("volunteerapplications").aggregate([
+      {
+        $group: {
+          _id: "$ministry",
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      }
+    ]).toArray();
 
-    if (result.deletedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Certificate request not found'
-      });
-    }
+    const stats = {
+      total: totalApplications,
+      pending: pendingApplications,
+      approved: approvedApplications,
+      rejected: rejectedApplications,
+      byMinistry: ministryStats
+    };
 
-    res.json({
-      success: true,
-      message: 'Certificate request deleted successfully'
-    });
-  } catch (error) {
-    console.error('Error deleting certificate request:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting certificate request: ' + error.message
-    });
+    res.status(200).json(stats);
+  } catch (err) {
+    console.error("Fetch volunteer stats error:", err);
+    res.status(500).json({ message: "Failed to fetch volunteer statistics." });
   }
 });
 
-// Search certificate requests
-app.get('/api/certificate-requests/search/:query', async (req, res) => {
+// Search volunteer applications
+app.get("/api/volunteer-applications/search/:query", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
   try {
     const { query } = req.params;
     
-    console.log(`🔍 Searching certificate requests: ${query}`);
-
-    const requests = await db.collection("certificaterequests").find({
+    const applications = await db.collection("volunteerapplications").find({
       $or: [
-        { certificateType: { $regex: query, $options: "i" } },
         { fullName: { $regex: query, $options: "i" } },
-        { certificateNumber: { $regex: query, $options: "i" } },
-        { purpose: { $regex: query, $options: "i" } }
+        { email: { $regex: query, $options: "i" } },
+        { ministry: { $regex: query, $options: "i" } },
+        { requestNumber: { $regex: query, $options: "i" } },
+        { contactNumber: { $regex: query, $options: "i" } },
+        { submittedByEmail: { $regex: query, $options: "i" } } // Include submittedByEmail in search
       ]
     }).sort({ createdAt: -1 }).toArray();
 
-    res.json({
-      success: true,
-      data: requests
-    });
-  } catch (error) {
-    console.error('Error searching certificate requests:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error searching certificate requests: ' + error.message
-    });
+    res.status(200).json(applications);
+  } catch (err) {
+    console.error("Search volunteer applications error:", err);
+    res.status(500).json({ message: "Failed to search volunteer applications." });
   }
 });
-
-// Get certificate statistics
-app.get('/api/certificate-stats', async (req, res) => {
+// ADD STATUS UPDATE ROUTE FOR KUMPIL
+app.put("/api/kumpil_requests/:id/status", async (req, res) => {
   try {
-    const total = await db.collection("certificaterequests").countDocuments();
-    const pending = await db.collection("certificaterequests").countDocuments({ status: 'Pending' });
-    const inProgress = await db.collection("certificaterequests").countDocuments({ status: 'In Progress' });
-    const completed = await db.collection("certificaterequests").countDocuments({ status: 'Completed' });
+    const { id } = req.params;
+    const { status, rejectionReason, cancellationReason, adminNotes, remarks } = req.body;
 
-    const stats = {
-      total,
-      pending,
-      inProgress,
-      completed
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
     };
 
-    res.json({
-      success: true,
-      data: stats
+    // CONSISTENT REASON FIELDS
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (cancellationReason !== undefined) updateData.cancellationReason = cancellationReason;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    const result = await db.collection("kumpilrequests").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Kumpil request not found." });
+    }
+
+    res.status(200).json({ 
+      message: `Kumpil request ${status} successfully!`,
+      status: status 
     });
-  } catch (error) {
-    console.error('Error fetching certificate stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching certificate statistics: ' + error.message
-    });
+  } catch (err) {
+    console.error("Update kumpil status error:", err);
+    res.status(500).json({ message: "Failed to update kumpil status." });
   }
 });
+
+// ADD STATUS UPDATE ROUTE FOR FUNERAL
+app.put("/api/funeral_requests/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, cancellationReason, adminNotes, remarks } = req.body;
+
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
+    };
+
+    // CONSISTENT REASON FIELDS
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (cancellationReason !== undefined) updateData.cancellationReason = cancellationReason;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    const result = await db.collection("funeralrequests").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Funeral request not found." });
+    }
+
+    res.status(200).json({ 
+      message: `Funeral request ${status} successfully!`,
+      status: status 
+    });
+  } catch (err) {
+    console.error("Update funeral status error:", err);
+    res.status(500).json({ message: "Failed to update funeral status." });
+  }
+});
+
+// ADD STATUS UPDATE ROUTE FOR PAMISA
+app.put("/api/pamisa_requests/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, cancellationReason, adminNotes, remarks } = req.body;
+
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
+    };
+
+    // CONSISTENT REASON FIELDS
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (cancellationReason !== undefined) updateData.cancellationReason = cancellationReason;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    const result = await db.collection("pamisarequests").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Pamisa request not found." });
+    }
+
+    res.status(200).json({ 
+      message: `Pamisa request ${status} successfully!`,
+      status: status 
+    });
+  } catch (err) {
+    console.error("Update pamisa status error:", err);
+    res.status(500).json({ message: "Failed to update pamisa status." });
+  }
+});
+
+// ADD STATUS UPDATE ROUTE FOR BLESSING
+app.put("/api/blessing_requests/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, cancellationReason, adminNotes, remarks } = req.body;
+
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
+    };
+
+    // CONSISTENT REASON FIELDS
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (cancellationReason !== undefined) updateData.cancellationReason = cancellationReason;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    const result = await db.collection("blessingrequests").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Blessing request not found." });
+    }
+
+    res.status(200).json({ 
+      message: `Blessing request ${status} successfully!`,
+      status: status 
+    });
+  } catch (err) {
+    console.error("Update blessing status error:", err);
+    res.status(500).json({ message: "Failed to update blessing status." });
+  }
+});
+
+// ADD STATUS UPDATE ROUTE FOR HOLY ORDERS
+app.put("/api/holy_orders_requests/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, cancellationReason, adminNotes, remarks } = req.body;
+
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
+    };
+
+    // CONSISTENT REASON FIELDS
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (cancellationReason !== undefined) updateData.cancellationReason = cancellationReason;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    const result = await db.collection("holyordersrequests").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Holy Orders request not found." });
+    }
+
+    res.status(200).json({ 
+      message: `Holy Orders request ${status} successfully!`,
+      status: status 
+    });
+  } catch (err) {
+    console.error("Update holy orders status error:", err);
+    res.status(500).json({ message: "Failed to update holy orders status." });
+  }
+});
+
+// ADD STATUS UPDATE ROUTE FOR FIRST COMMUNION
+app.put("/api/first_communion_requests/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, cancellationReason, adminNotes, remarks } = req.body;
+
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
+    };
+
+    // CONSISTENT REASON FIELDS
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (cancellationReason !== undefined) updateData.cancellationReason = cancellationReason;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    const result = await db.collection("firstcommunionrequests").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "First Communion request not found." });
+    }
+
+    res.status(200).json({ 
+      message: `First Communion request ${status} successfully!`,
+      status: status 
+    });
+  } catch (err) {
+    console.error("Update first communion status error:", err);
+    res.status(500).json({ message: "Failed to update first communion status." });
+  }
+});
+
 
 // =======================
 // START SERVER
