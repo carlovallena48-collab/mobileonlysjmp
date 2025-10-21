@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Modal,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
 
@@ -62,15 +63,51 @@ const VolunteerFormScreen = ({ navigation, route }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const [currentUserData, setCurrentUserData] = useState(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
-  // Get user data from navigation params
-  const userEmail = route.params?.userEmail || "";
+  // Get currently logged-in user data
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        console.log('🔍 [VOLUNTEER FORM] Getting current user data...');
+        
+        // 1. Try from AsyncStorage first (most reliable)
+        const storedUser = await AsyncStorage.getItem('@userData');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          if (userData.email) {
+            console.log('✅ [VOLUNTEER FORM] Got user data from AsyncStorage:', userData.email);
+            setCurrentUserEmail(userData.email);
+            setCurrentUserData(userData);
+            return;
+          }
+        }
 
-  // Animation for content entry
-  React.useEffect(() => {
+        // 2. Try from navigation params
+        const paramsEmail = route.params?.userEmail;
+        const paramsUserData = route.params?.userData;
+        
+        if (paramsEmail) {
+          console.log('✅ [VOLUNTEER FORM] Got email from params:', paramsEmail);
+          setCurrentUserEmail(paramsEmail);
+          setCurrentUserData(paramsUserData || { email: paramsEmail });
+          return;
+        }
+
+        console.log('❌ [VOLUNTEER FORM] No user data found anywhere');
+        
+      } catch (error) {
+        console.error('❌ [VOLUNTEER FORM] Error getting user data:', error);
+      }
+    };
+
+    getCurrentUser();
+
+    // Animation for content entry
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -108,6 +145,11 @@ const VolunteerFormScreen = ({ navigation, route }) => {
       return;
     }
 
+    if (!currentUserEmail) {
+      Alert.alert("Authentication Error", "Please log in to submit an application.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -115,17 +157,22 @@ const VolunteerFormScreen = ({ navigation, route }) => {
       const volunteerData = {
         ministry: selectedServer,
         fullName: formData.fullName,
-        email: formData.email,
+        email: formData.email, // Email from form (can be different)
         contactNumber: formData.contactNumber,
-        submittedByEmail: userEmail || formData.email, // Use logged-in user's email if available
+        submittedByEmail: currentUserEmail, // ALWAYS the logged-in user's email
+        submittedByName: currentUserData?.fullName || "User",
         status: "pending",
         applicationDate: new Date().toISOString(),
         requestNumber: `VOL-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         createdAt: new Date(),
-        lastUpdated: new Date()
+        lastUpdated: new Date(),
+        userAccountEmail: currentUserEmail, // Track the actual account owner
+        applicationType: "volunteer"
       };
 
       console.log('📤 Submitting volunteer application:', volunteerData);
+      console.log('👤 Logged-in user (Submitted By):', currentUserEmail);
+      console.log('📧 Application Contact Email:', formData.email);
 
       // Send to your backend API
       const response = await fetch(`${API_BASE_URL}/api/volunteer-applications`, {
@@ -140,6 +187,8 @@ const VolunteerFormScreen = ({ navigation, route }) => {
 
       if (response.ok) {
         console.log('✅ Volunteer application saved to database');
+        console.log('✅ Application submitted by:', currentUserEmail);
+        console.log('✅ Application contact details:', formData.email);
         setIsSubmitting(false);
         setSuccessModalVisible(true);
       } else {
@@ -184,8 +233,14 @@ const VolunteerFormScreen = ({ navigation, route }) => {
           </View>
           <Text style={styles.successTitle}>Application Submitted!</Text>
           <Text style={styles.successMessage}>
-            Thank you {formData.fullName} for your interest in serving as {selectedServer}. 
-            We will contact you soon at {formData.email}.
+            Thank you for submitting the volunteer application for {formData.fullName}.{"\n\n"}
+            <Text style={styles.successDetail}>
+              <Text style={styles.boldText}>Ministry:</Text> {selectedServer}{"\n"}
+              <Text style={styles.boldText}>Contact Email:</Text> {formData.email}{"\n"}
+              <Text style={styles.boldText}>Contact Number:</Text> {formData.contactNumber}{"\n"}
+              <Text style={styles.boldText}>Submitted By:</Text> {currentUserEmail}
+            </Text>{"\n\n"}
+            We will contact {formData.fullName} soon at {formData.contactNumber}.
           </Text>
           <TouchableOpacity style={styles.successButton} onPress={handleSuccessClose}>
             <Text style={styles.successButtonText}>Continue</Text>
@@ -210,7 +265,9 @@ const VolunteerFormScreen = ({ navigation, route }) => {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Volunteer Registration</Text>
-          <Text style={styles.headerSubtitle}>Serve the Church Community</Text>
+          <Text style={styles.headerSubtitle}>
+            {currentUserEmail ? `Submitted by: ${currentUserEmail}` : 'Serve the Church Community'}
+          </Text>
         </View>
       </View>
 
@@ -228,6 +285,20 @@ const VolunteerFormScreen = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
+          {/* User Info Banner */}
+          {currentUserEmail && (
+            <View style={styles.userInfoBanner}>
+              <Ionicons name="person-circle" size={20} color={PRIMARY_COLOR} />
+              <View style={styles.userInfoContent}>
+                <Text style={styles.userInfoTitle}>You are submitting this application</Text>
+                <Text style={styles.userInfoText}>Account: {currentUserEmail}</Text>
+                <Text style={styles.userInfoNote}>
+                  This application will appear in your volunteer history. You can enter different contact details below.
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Ministry Selection Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -278,15 +349,18 @@ const VolunteerFormScreen = ({ navigation, route }) => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="person" size={24} color={PRIMARY_COLOR} />
-              <Text style={styles.sectionTitle}>Personal Information</Text>
+              <Text style={styles.sectionTitle}>Application Contact Details</Text>
             </View>
+            <Text style={styles.sectionDescription}>
+              Enter the contact information for this volunteer application. This can be different from your account email.
+            </Text>
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>
                 <Ionicons name="person-outline" size={20} color={PRIMARY_COLOR} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Full Name"
+                  placeholder="Full Name *"
                   value={formData.fullName}
                   onChangeText={(text) => handleInputChange('fullName', text)}
                   placeholderTextColor="#9ca3af"
@@ -297,7 +371,7 @@ const VolunteerFormScreen = ({ navigation, route }) => {
                 <Ionicons name="mail-outline" size={20} color={PRIMARY_COLOR} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Email Address"
+                  placeholder="Contact Email *"
                   value={formData.email}
                   onChangeText={(text) => handleInputChange('email', text)}
                   keyboardType="email-address"
@@ -310,12 +384,25 @@ const VolunteerFormScreen = ({ navigation, route }) => {
                 <Ionicons name="call-outline" size={20} color={PRIMARY_COLOR} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Contact Number"
+                  placeholder="Contact Number *"
                   value={formData.contactNumber}
                   onChangeText={(text) => handleInputChange('contactNumber', text)}
                   keyboardType="phone-pad"
                   placeholderTextColor="#9ca3af"
                 />
+              </View>
+
+              {/* Info message */}
+              <View style={styles.applicationInfo}>
+                <Ionicons name="information-circle" size={16} color={PRIMARY_COLOR} />
+                <View style={styles.applicationInfoText}>
+                  <Text style={styles.infoTitle}>About This Application</Text>
+                  <Text style={styles.infoText}>
+                    • You are submitting this as: <Text style={styles.highlightText}>{currentUserEmail}</Text>{"\n"}
+                    • Application will appear in your volunteer history{"\n"}
+                    • Contact details can be different from your account
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -328,7 +415,7 @@ const VolunteerFormScreen = ({ navigation, route }) => {
               styles.submitButtonDisabled
             ]}
             onPress={handleSubmit}
-            disabled={!selectedServer || !formData.fullName || !formData.email || !formData.contactNumber || isSubmitting}
+            disabled={!selectedServer || !formData.fullName || !formData.email || !formData.contactNumber || isSubmitting || !currentUserEmail}
           >
             <View style={styles.submitContent}>
               <Ionicons 
@@ -342,6 +429,7 @@ const VolunteerFormScreen = ({ navigation, route }) => {
               </Text>
             </View>
           </TouchableOpacity>
+          
           <View style={{ height: 40 }}/>
         </ScrollView>
       </Animated.View>
@@ -355,8 +443,6 @@ const styles = StyleSheet.create({
   // 1. SAFE AREA & HEADER (Sagad sa Screen)
   safeArea: {
     flex: 1,
-    // Note: The SafeAreaView's background is set to PRIMARY_COLOR in the component
-    // to ensure the status bar area is filled correctly.
   },
   header: {
     flexDirection: 'row',
@@ -364,7 +450,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     backgroundColor: PRIMARY_COLOR,
-    paddingTop: 15, // Ensure some padding below the status bar
+    paddingTop: 15,
   },
   backButton: {
     padding: 8,
@@ -374,14 +460,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24, // Made title a bit bigger
+    fontSize: 24,
     fontWeight: '900',
     color: '#fff',
     marginBottom: 2,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: SECONDARY_COLOR, // Highlight subtitle
+    color: SECONDARY_COLOR,
     fontWeight: '600',
   },
   // 2. CONTENT CONTAINER
@@ -390,8 +476,6 @@ const styles = StyleSheet.create({
     backgroundColor: BACKGROUND_COLOR,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    // Removed marginTop: 10 as it's cleaner without it, letting the header border naturally
-    // meet the curved top of the content area.
   },
   scrollView: {
     flex: 1,
@@ -400,10 +484,42 @@ const styles = StyleSheet.create({
     padding: 25,
     paddingBottom: 40,
   },
-  // 3. SECTION STYLES
+  // 3. USER INFO BANNER
+  userInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ecfdf5',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: PRIMARY_COLOR,
+  },
+  userInfoContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  userInfoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: PRIMARY_COLOR,
+    marginBottom: 4,
+  },
+  userInfoText: {
+    fontSize: 14,
+    color: '#065f46',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  userInfoNote: {
+    fontSize: 12,
+    color: '#047857',
+    lineHeight: 16,
+  },
+  // 4. SECTION STYLES
   section: {
     marginBottom: 30,
-    paddingHorizontal: 5, // Slight padding to push grid from edge
+    paddingHorizontal: 5,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -411,7 +527,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 22, // Made title bigger
+    fontSize: 22,
     fontWeight: '800',
     color: '#1f2937',
     marginLeft: 10,
@@ -422,21 +538,21 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
-  // 4. MINISTRY GRID (3 Columns for better fit)
+  // 5. MINISTRY GRID (3 Columns for better fit)
   serverGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   serverCard: {
-    width: (width - 60) / 3.2, // Adjusted for 3 columns (60 is padding + margin)
+    width: (width - 60) / 3.2,
     backgroundColor: CARD_BACKGROUND,
     borderRadius: 12,
     padding: 10,
     marginBottom: 10,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#e5e7eb', // Light border for default
+    borderColor: '#e5e7eb',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -446,13 +562,13 @@ const styles = StyleSheet.create({
   },
   serverCardSelected: {
     borderColor: PRIMARY_COLOR,
-    backgroundColor: '#ecfdf5', // Lighter shade of mint
+    backgroundColor: '#ecfdf5',
     shadowColor: PRIMARY_COLOR,
     shadowOpacity: 0.2,
     elevation: 4,
   },
   serverIconContainer: {
-    width: 40, // Smaller icon container for 3 columns
+    width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: BACKGROUND_COLOR,
@@ -467,7 +583,7 @@ const styles = StyleSheet.create({
     borderColor: PRIMARY_COLOR,
   },
   serverName: {
-    fontSize: 10, // Smaller font for 3 columns
+    fontSize: 10,
     fontWeight: '600',
     color: '#374151',
     textAlign: 'center',
@@ -488,7 +604,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // 5. FORM STYLES
+  // 6. FORM STYLES
   form: {
     marginTop: 10,
     paddingHorizontal: 5,
@@ -517,9 +633,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1f2937',
     fontWeight: '500',
-    paddingVertical: 0, // Ensure no extra padding from RN default
+    paddingVertical: 0,
   },
-  // 6. SUBMIT BUTTON
+  applicationInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f0f9ff',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0ea5e9',
+  },
+  applicationInfoText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0c4a6e',
+    marginBottom: 6,
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#0369a1',
+    lineHeight: 18,
+  },
+  highlightText: {
+    fontWeight: '700',
+    color: PRIMARY_COLOR,
+  },
+  // 7. SUBMIT BUTTON
   submitButton: {
     backgroundColor: PRIMARY_COLOR,
     borderRadius: 16,
@@ -532,7 +677,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     marginTop: 10,
-    marginHorizontal: 25, // Aligned with the content (25 padding)
+    marginHorizontal: 25,
   },
   submitButtonDisabled: {
     backgroundColor: '#9ca3af',
@@ -549,7 +694,7 @@ const styles = StyleSheet.create({
     color: CARD_BACKGROUND,
     marginLeft: 10,
   },
-  // 7. MODAL STYLES (Minor tweaks)
+  // 8. MODAL STYLES
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -585,6 +730,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 25,
+  },
+  successDetail: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  boldText: {
+    fontWeight: '700',
+    color: PRIMARY_COLOR,
   },
   successButton: {
     backgroundColor: PRIMARY_COLOR,

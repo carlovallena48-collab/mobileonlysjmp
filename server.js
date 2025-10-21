@@ -1672,7 +1672,7 @@ app.get("/api/first_communion_requests/:email", async (req, res) => {
   }
 });
 // =======================
-// GET ALL USER REQUESTS (FOR HISTORY/DASHBOARD)
+// GET ALL USER REQUESTS (FOR HISTORY/DASHBOARD) - UPDATED WITH SICKCALL
 // =======================
 app.get("/api/user_requests/:email", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database not connected yet." });
@@ -1683,7 +1683,7 @@ app.get("/api/user_requests/:email", async (req, res) => {
 
     console.log(`📊 Getting all requests for user: ${userEmail}`);
 
-    // Get requests from ALL sacrament collections including funeral
+    // Get requests from ALL sacrament collections including sickcall
     const [
       baptismRequests, 
       kumpilRequests, 
@@ -1692,7 +1692,8 @@ app.get("/api/user_requests/:email", async (req, res) => {
       blessingRequests, 
       holyOrdersRequests, 
       firstCommunionRequests, 
-      funeralRequests  // ADD THIS
+      funeralRequests,
+      sickcallRequests  // ADD THIS LINE
     ] = await Promise.all([
       db.collection("baptismrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
       db.collection("kumpilrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
@@ -1701,7 +1702,8 @@ app.get("/api/user_requests/:email", async (req, res) => {
       db.collection("blessingrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
       db.collection("holyordersrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
       db.collection("firstcommunionrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
-      db.collection("funeralrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray() // ADD THIS LINE
+      db.collection("funeralrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray(),
+      db.collection("sickcallrequests").find({ submittedByEmail: userEmail }).sort({ createdAt: -1 }).toArray() // ADD THIS LINE
     ]);
 
     // Combine all requests and sort by creation date
@@ -1713,11 +1715,12 @@ app.get("/api/user_requests/:email", async (req, res) => {
       ...blessingRequests,
       ...holyOrdersRequests,
       ...firstCommunionRequests,
-      ...funeralRequests // ADD THIS LINE
+      ...funeralRequests,
+      ...sickcallRequests // ADD THIS LINE
     ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     console.log(`✅ Total requests found: ${allRequests.length}`);
-    console.log(`📋 Breakdown - Baptism: ${baptismRequests.length}, Funeral: ${funeralRequests.length}`);
+    console.log(`📋 Breakdown - Baptism: ${baptismRequests.length}, Funeral: ${funeralRequests.length}, SickCall: ${sickcallRequests.length}`);
 
     res.status(200).json(allRequests);
   } catch (err) {
@@ -2345,7 +2348,171 @@ app.put("/api/first_communion_requests/:id/status", async (req, res) => {
     res.status(500).json({ message: "Failed to update first communion status." });
   }
 });
+// =======================
+// SICKCALL REQUEST ROUTES - NEWLY ADDED
+// =======================
+app.post("/api/sickcall_requests", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
 
+  try {
+    console.log('📥 Received SickCall request:', req.body);
+
+    // Basic validation
+    if (!req.body.fullName || !req.body.email || !req.body.contactNumber || 
+        !req.body.dateOfVisit || !req.body.timeOfVisit || !req.body.sickness) {
+      return res.status(400).json({ 
+        message: "All fields are required: full name, email, contact number, date of visit, time of visit, and sickness description." 
+      });
+    }
+
+    // CRITICAL: Make sure submittedByEmail is included
+    if (!req.body.submittedByEmail) {
+      return res.status(400).json({ 
+        message: "User email is required. Please login first." 
+      });
+    }
+
+    const sickCallData = {
+      sacrament: "Sick Call",
+      fullName: req.body.fullName,
+      email: req.body.email,
+      contactNumber: req.body.contactNumber,
+      dateOfVisit: req.body.dateOfVisit,
+      timeOfVisit: req.body.timeOfVisit,
+      sickness: req.body.sickness,
+      status: "pending",
+      submittedByEmail: req.body.submittedByEmail.trim().toLowerCase(),
+      createdAt: new Date(),
+      requestNumber: `SICK-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      lastUpdated: new Date(),
+    
+      
+    };
+
+    const result = await db.collection("sickcallrequests").insertOne(sickCallData);
+
+    console.log('✅ SickCall request saved:', sickCallData.requestNumber);
+    console.log('👤 Submitted by:', sickCallData.submittedByEmail);
+
+    res.status(201).json({ 
+      message: "Sick Call request submitted successfully! A priest will visit you at the scheduled time.", 
+      id: result.insertedId,
+      requestNumber: sickCallData.requestNumber
+    });
+  } catch (err) {
+    console.error("SickCall request save error:", err);
+    res.status(500).json({ message: "Failed to submit Sick Call request." });
+  }
+});
+
+// Get all SickCall requests (for admin)
+app.get("/api/sickcall_requests", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const requests = await db
+      .collection("sickcallrequests")
+      .find()
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Fetch SickCall requests error:", err);
+    res.status(500).json({ message: "Failed to fetch SickCall requests." });
+  }
+});
+
+// Get SickCall requests by user email
+app.get("/api/sickcall_requests/:email", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const { email } = req.params;
+    const userEmail = email.trim().toLowerCase();
+
+    console.log(`🔍 Fetching sickcall requests for: ${userEmail}`);
+
+    const requests = await db
+      .collection("sickcallrequests")
+      .find({ submittedByEmail: userEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    console.log(`✅ Found ${requests.length} sickcall requests for ${userEmail}`);
+
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Fetch user SickCall requests error:", err);
+    res.status(500).json({ message: "Failed to fetch SickCall requests." });
+  }
+});
+
+// Update SickCall request status (for admin)
+app.put("/api/sickcall_requests/:id/status", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, cancellationReason, adminNotes, remarks, priestAssigned, visitStatus } = req.body;
+
+    const updateData = {
+      status: status,
+      lastUpdated: new Date()
+    };
+
+    // CONSISTENT REASON FIELDS
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (cancellationReason !== undefined) updateData.cancellationReason = cancellationReason;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (remarks !== undefined) updateData.remarks = remarks;
+    if (priestAssigned !== undefined) updateData.priestAssigned = priestAssigned;
+    if (visitStatus !== undefined) updateData.visitStatus = visitStatus;
+
+    const result = await db.collection("sickcallrequests").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "SickCall request not found." });
+    }
+
+    res.status(200).json({ 
+      message: `SickCall request ${status} successfully!`,
+      status: status 
+    });
+  } catch (err) {
+    console.error("Update SickCall status error:", err);
+    res.status(500).json({ message: "Failed to update SickCall status." });
+  }
+});
+
+// Get SickCall statistics
+app.get("/api/sickcall-stats", async (req, res) => {
+  if (!db) return res.status(500).json({ message: "Database not connected yet." });
+
+  try {
+    const totalRequests = await db.collection("sickcallrequests").countDocuments();
+    const pendingRequests = await db.collection("sickcallrequests").countDocuments({ status: "pending" });
+    const approvedRequests = await db.collection("sickcallrequests").countDocuments({ status: "approved" });
+    const completedVisits = await db.collection("sickcallrequests").countDocuments({ visitStatus: "completed" });
+    const urgentRequests = await db.collection("sickcallrequests").countDocuments({ emergencyLevel: "urgent" });
+
+    const stats = {
+      total: totalRequests,
+      pending: pendingRequests,
+      approved: approvedRequests,
+      completedVisits: completedVisits,
+      urgentRequests: urgentRequests
+    };
+
+    res.status(200).json(stats);
+  } catch (err) {
+    console.error("Fetch SickCall stats error:", err);
+    res.status(500).json({ message: "Failed to fetch SickCall statistics." });
+  }
+});
 
 // =======================
 // START SERVER

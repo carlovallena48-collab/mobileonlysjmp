@@ -12,6 +12,8 @@ import {
     Dimensions,
     Alert,
     TextInput,
+    Animated,
+    Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,113 +23,208 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from 'expo-image-picker'; 
 
-const { height } = Dimensions.get("window");
+const { height, width } = Dimensions.get("window");
 
-// --- REFINED COLOR PALETTE (DARK GREEN/EMERALD FOCUS) ---
+// 🎨 PREMIUM GREEN & GOLD COLOR PALETTE
 const COLORS = {
-    primary: "#05668D",
-    primaryLight: "#028090",
-    background: "#F8F8F8",
-    cardBackground: "#FFFFFF",
-    textDark: "#1E293B",
-    textGray: "#64748B",
-    success: "#4CC9F0",
-    danger: "#EF4444",
-    borderColor: "#E2E8F0",
+    primary: "#059669",       // Emerald Green
+    primaryLight: "#10b981",  // Green
+    secondary: "#f59e0b",     // Amber
+    accent: "#22d3ee",        // Cyan
+    background: "#f0fdf4",    // Soft Green Background
+    cardBackground: "#ffffff",
+    textDark: "#1c1917",
+    textGray: "#57534e",
+    success: "#16a34a",       // Green
+    danger: "#dc2626",        // Red
+    warning: "#d97706",       // Amber
+    borderColor: "#d1fae5",
 };
 
-// --- SETTING OPTIONS ---
+// ✨ ANIMATION VALUES
+const fadeAnim = new Animated.Value(0);
+const slideAnim = new Animated.Value(50);
+
+// 🎯 SETTING OPTIONS WITH BETTER ICONS
 const settingOptions = {
     account: [
-        { name: "Full Name", key: "fullName", icon: "person-circle-outline" },
-        { name: "Email", key: "email", icon: "mail-outline" },
-        { name: "Address", key: "address", icon: "home-outline" },
-        { name: "Contact", key: "contact", icon: "call-outline" },
-        { name: "Role", key: "role", icon: "shield-checkmark-outline" },
+        { name: "Full Name", key: "fullName", icon: "person" },
+        { name: "Email", key: "email", icon: "at" },
+        { name: "Address", key: "address", icon: "location" },
+        { name: "Contact", key: "contact", icon: "call" },
+        { name: "Role", key: "role", icon: "ribbon" },
     ],
     security: [
-        { name: "Change Password", icon: "lock-closed-outline", key: "changePassword" },
+        { name: "Change Password", icon: "lock-closed", key: "changePassword" },
     ],
     support: [ 
-        { name: "Privacy Policy", icon: "document-text-outline", key: "privacy" },
-        { name: "Terms of Service", icon: "newspaper-outline", key: "terms" },
+        { name: "Privacy Policy", icon: "shield-checkmark", key: "privacy" },
+        { name: "Terms of Service", icon: "document-text", key: "terms" },
     ]
 };
 
-// --- INFO ROW COMPONENT ---
+// ✨ ENHANCED INFO ROW COMPONENT
 const InfoRow = ({ label, value, icon, isClickable = false, onPress }) => {
     const isLogout = label === "Log Out";
+    const [scaleValue] = useState(new Animated.Value(1));
+    
+    const handlePressIn = () => {
+        Animated.spring(scaleValue, {
+            toValue: 0.95,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleValue, {
+            toValue: 1,
+            friction: 3,
+            useNativeDriver: true,
+        }).start();
+    };
+
     const clickable = isClickable || isLogout;
     
     return (
-        <TouchableOpacity
-            style={styles.optionRow}
-            onPress={onPress}
-            disabled={!clickable}
-            activeOpacity={clickable ? 0.7 : 1}
-        >
-            <View style={[styles.iconContainer, { backgroundColor: isLogout ? 'rgba(239, 68, 68, 0.1)' : 'rgba(5, 102, 141, 0.1)' }]}>
-                <Ionicons 
-                    name={icon} 
-                    size={20}
-                    color={isLogout ? COLORS.danger : COLORS.primary}
-                />
-            </View>
-            <View style={styles.textContainer}>
-                <Text style={styles.optionLabel}>{label}</Text>
-                <Text 
-                    style={[
-                        styles.optionValue, 
-                        { color: isLogout ? COLORS.danger : (label === 'Email' || label === 'Role' ? COLORS.textGray : COLORS.textDark) }
-                    ]}
-                    numberOfLines={1}
+        <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
+            <TouchableOpacity
+                style={[
+                    styles.optionRow,
+                    isLogout && styles.logoutRow
+                ]}
+                onPress={onPress}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                disabled={!clickable}
+                activeOpacity={clickable ? 0.8 : 1}
+            >
+                <LinearGradient
+                    colors={isLogout ? 
+                        ['#fef2f2', '#fecaca'] : 
+                        ['#dcfce7', '#bbf7d0']
+                    }
+                    style={styles.iconContainer}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                 >
-                    {value}
-                </Text>
-            </View>
-            {clickable && label !== "Email" && ( 
-                <Ionicons
-                    name="chevron-forward-outline"
-                    size={20}
-                    color={isLogout ? COLORS.danger : COLORS.textGray}
-                />
-            )}
-        </TouchableOpacity>
+                    <Ionicons 
+                        name={icon} 
+                        size={22}
+                        color={isLogout ? COLORS.danger : COLORS.primary}
+                    />
+                </LinearGradient>
+                
+                <View style={styles.textContainer}>
+                    <Text style={[
+                        styles.optionLabel,
+                        isLogout && { color: COLORS.danger }
+                    ]}>
+                        {label}
+                    </Text>
+                    <Text 
+                        style={[
+                            styles.optionValue, 
+                            { 
+                                color: isLogout ? COLORS.danger : 
+                                (label === 'Email' || label === 'Role' ? COLORS.textGray : COLORS.textDark) 
+                            }
+                        ]}
+                        numberOfLines={1}
+                    >
+                        {value}
+                    </Text>
+                </View>
+                
+                {clickable && label !== "Email" && ( 
+                    <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color={isLogout ? COLORS.danger : COLORS.primary}
+                    />
+                )}
+            </TouchableOpacity>
+        </Animated.View>
     );
 };
 
-// --- PRIVACY AND TERMS MODAL COMPONENT ---
-const PrivacyAndTermsModal = ({ title, content, onClose, isVisible }) => (
-    <Modal
-        transparent={true}
-        visible={isVisible}
-        animationType="slide"
-        onRequestClose={onClose}
-    >
-        <Pressable style={styles.modalContainer} onPress={onClose}>
-            <Pressable onPress={() => {}} style={styles.legalModalView}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>{title}</Text>
-                    <ScrollView style={styles.legalScroll}>
+// ✨ PREMIUM MODAL COMPONENT - IMPROVED TOUCH AREA
+const PrivacyAndTermsModal = ({ title, content, onClose, isVisible }) => {
+    const [fadeAnim] = useState(new Animated.Value(0));
+
+    useEffect(() => {
+        if (isVisible) {
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }).start();
+        }
+    }, [isVisible]);
+
+    return (
+        <Modal
+            transparent={true}
+            visible={isVisible}
+            animationType="slide"
+            onRequestClose={onClose}
+        >
+            <View style={styles.modalContainer}>
+                <Animated.View 
+                    style={[
+                        styles.legalModalView,
+                        { opacity: fadeAnim }
+                    ]}
+                >
+                    <LinearGradient
+                        colors={[COLORS.primary, COLORS.primaryLight]}
+                        style={styles.modalHeader}
+                    >
+                        <Text style={styles.modalTitle}>{title}</Text>
+                        <TouchableOpacity 
+                            onPress={onClose} 
+                            style={styles.closeIcon}
+                            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                        >
+                            <Ionicons name="close" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </LinearGradient>
+                    
+                    <ScrollView 
+                        style={styles.legalScroll}
+                        showsVerticalScrollIndicator={true}
+                    >
                         {content.split('\n\n').map((paragraph, index) => (
                             <Text key={index} style={styles.legalText}>
                                 {paragraph}
                             </Text>
                         ))}
                     </ScrollView>
-                    <Pressable
-                        style={[styles.closeButton, { backgroundColor: COLORS.primary, marginTop: 15 }]}
+                    
+                    <TouchableOpacity
+                        style={styles.closeButton}
                         onPress={onClose}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.closeButtonText}>Close</Text>
-                    </Pressable>
-                </View>
-            </Pressable>
-        </Pressable>
-    </Modal>
-);
+                      <TouchableOpacity
+    style={styles.closeDocumentContainer}
+    onPress={onClose}
+    activeOpacity={0.8}
+>
+    <LinearGradient
+        colors={[COLORS.primary, COLORS.primaryLight]}
+        style={styles.closeDocumentButton}
+    >
+        <Text style={styles.closeDocumentText}>Close Document</Text>
+    </LinearGradient>
+</TouchableOpacity>
+                    </TouchableOpacity>
+                </Animated.View>
+            </View>
+        </Modal>
+    );
+};
 
-// --- MAIN PROFILE SCREEN COMPONENT ---
+// 🎭 MAIN PROFILE SCREEN COMPONENT
 const ProfileScreen = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -138,18 +235,362 @@ const ProfileScreen = () => {
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false); 
     const [editedUser, setEditedUser] = useState({});
     const [isProfileUpdating, setIsProfileUpdating] = useState(false); 
+    const [headerScroll] = useState(new Animated.Value(0));
     
     const navigation = useNavigation();
     
     const API_BASE_URL = `http://192.168.100.199:5000`; 
     const PROFILE_IMAGE_DEFAULT = "https://i.ibb.co/L95zB7X/emojiprofile.png";
     const ASYNC_IMAGE_KEY_PREFIX = "@user_profile_image_";
-    
-    // --- LEGAL CONTENT ---
-    const PRIVACY_POLICY_CONTENT = `Privacy Policy for SJMP(sanjose manggagawa parish)...`;
-    const TERMS_OF_SERVICE_CONTENT = `Terms of Service for SJMP (sanjose manggagawa parish)...`;
 
-    // --- FUNCTION: FETCH PROFILE ---
+    // Header animation
+    const headerHeight = headerScroll.interpolate({
+        inputRange: [0, 100],
+        outputRange: [height * 0.35, height * 0.2],
+        extrapolate: 'clamp',
+    });
+
+    const headerOpacity = headerScroll.interpolate({
+        inputRange: [0, 50],
+        outputRange: [1, 0.8],
+        extrapolate: 'clamp',
+    });
+
+      // ✨ LEGAL CONTENT (Same as before)
+      // --- LEGAL CONTENT ---
+const PRIVACY_POLICY_CONTENT = `PRIVACY POLICY
+San Jose Manggagawa Parish (SJMP)
+
+Last Updated: ${new Date().getFullYear()}
+
+1. INTRODUCTION
+San Jose Manggagawa Parish ("we," "our," or "the Parish") is committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and related services.
+
+2. INFORMATION WE COLLECT
+
+2.1 Personal Information
+- Full Name
+- Email Address
+- Contact Number
+- Residential Address
+- Profile Photograph
+- Sacramental Records (Baptism, Confirmation, Marriage, etc.)
+- Mass and Event Attendance
+- Prayer Requests and Intentions
+
+2.2 Technical Information
+- Device Information
+- App Usage Statistics
+- Authentication Data
+
+2.3 NO FINANCIAL DATA COLLECTION
+Important: This application does NOT collect, process, or store any financial information. All financial transactions including donations, fees, and payments are handled exclusively through the Parish Office via direct personal transactions.
+
+3. HOW WE USE YOUR INFORMATION
+
+3.1 Parish Operations
+- Managing sacramental records and certificates
+- Coordinating parish events and activities
+- Processing event registrations and reservations
+- Sending important parish announcements and updates
+- Facilitating prayer requests and spiritual support
+
+3.2 Communication
+- Sending religious and spiritual content
+- Notifying about mass schedules and special events
+- Providing pastoral care and follow-up
+- Sharing parish news and community updates
+
+3.3 Legal and Administrative
+- Maintaining official parish records
+- Complying with canonical and civil law requirements
+- Generating statistical reports for diocesan requirements
+
+4. DATA SHARING AND DISCLOSURE
+
+4.1 Within the Church
+- Parish priests and staff for ministerial purposes
+- Diocese officials for canonical records
+- Volunteer ministers for specific pastoral activities
+
+4.2 Third-Party Services
+- Cloud storage providers for data backup
+- Communication platforms for parish announcements
+
+4.3 Legal Requirements
+We may disclose your information when required by:
+- Canon Law requirements
+- Civil legal obligations
+- Protection of vital interests
+
+5. DATA SECURITY
+
+We implement appropriate technical and organizational measures to protect your personal information, including:
+- Encryption of sensitive data
+- Secure server infrastructure
+- Regular security assessments
+- Access controls and authentication
+- Staff training on data protection
+
+6. DATA RETENTION
+
+We retain your personal information for:
+- Sacramental records: Permanently (as required by Canon Law)
+- General parish records: While you remain an active member
+- Inactive accounts: 5 years after last activity
+
+7. YOUR RIGHTS
+
+You have the right to:
+- Access your personal information
+- Correct inaccurate data
+- Request deletion of non-essential data
+- Object to certain processing activities
+- Request data portability
+- Withdraw consent where applicable
+
+8. CHILDREN'S PRIVACY
+
+We are especially careful with children's data:
+- Parental consent required for minors under 13
+- Limited data collection for children
+- Special protection for sacramental records
+- Parental access and control over children's data
+
+9. PHOTOGRAPHS AND MEDIA
+
+By using our services, you agree that:
+- Profile photos may be used for internal identification
+- Event photos may be used in parish publications
+- You may opt-out of public media usage
+- Consent can be withdrawn at any time
+
+10. FINANCIAL TRANSACTIONS
+
+IMPORTANT NOTICE: All financial matters including:
+- Donations and offerings
+- Mass stipends and intentions
+- Sacramental fees and offerings
+- Event registration fees
+- Other financial contributions
+
+Are processed EXCLUSIVELY through the San Jose Manggagawa Parish Office during office hours. This mobile application does not handle any financial transactions.
+
+11. CHANGES TO THIS POLICY
+
+We may update this policy to reflect:
+- Changes in Canon Law
+- Updates to civil data protection laws
+- Improvements to our services
+- User feedback and needs
+
+12. CONTACT INFORMATION
+
+For privacy-related concerns, contact:
+San Jose Manggagawa Parish Data Protection Officer
+Email: sanjosemanggagawaparish@gmail.com    
+Phone: 0967074316482
+Address: E. Rodriguez Highway, Cor. E. Manuel St., Brgy. San Jose, Rodriguez, Rizal
+
+13. DIOCESAN OVERSIGHT
+
+This privacy policy operates under the guidance and approval of the Diocese of [Your Diocese Name] and complies with both Canon Law and applicable data protection regulations.
+
+14. SPIRITUAL COMMITMENT
+
+As a Catholic parish, we treat your personal information with the same respect and dignity we accord to every individual as children of God. We are committed to being good stewards of the information entrusted to us.
+
+15. CONSENT
+
+By using our mobile application and services, you consent to the collection and use of your information as described in this Privacy Policy.
+
+"Whatever you do, do everything for the glory of God." - 1 Corinthians 10:31`;
+
+const TERMS_OF_SERVICE_CONTENT = `TERMS OF SERVICE
+San Jose Manggagawa Parish Mobile Application
+
+Last Updated: ${new Date().getFullYear()}
+
+1. ACCEPTANCE OF TERMS
+By accessing and using the San Jose Manggagawa Parish mobile application ("the App"), you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree with any part of these terms, please do not use our App.
+
+2. DESCRIPTION OF SERVICE
+The App provides:
+- Access to parish information and schedules
+- Sacramental record management
+- Event registration and management
+- Prayer request submission
+- Spiritual content and resources
+- Parish community communication
+- Mass and event notifications
+
+IMPORTANT: This App does NOT provide financial transaction capabilities. All donations and payments must be made directly at the Parish Office.
+
+3. USER ACCOUNTS
+
+3.1 Registration
+To access certain features, you must register an account providing accurate and complete information. You are responsible for maintaining the confidentiality of your account credentials.
+
+3.2 Account Types
+- Parishioner Accounts: For general parish members
+- Volunteer Accounts: For ministry volunteers
+- Staff Accounts: For parish employees and clergy
+- Administrative Accounts: For parish leadership
+
+3.3 Account Security
+You are responsible for all activities under your account. Notify us immediately of any unauthorized use.
+
+4. ACCEPTABLE USE
+
+4.1 Permitted Uses
+- Religious and spiritual purposes
+- Parish community engagement
+- Sacramental preparation and follow-up
+- Event registration and coordination
+- Personal spiritual growth
+- Prayer request submissions
+
+4.2 Prohibited Activities
+- Commercial advertising or solicitation
+- Harassment or offensive behavior
+- Distribution of malicious software
+- Unauthorized data collection
+- Impersonation of parish staff
+- Distribution of heretical content
+- Disruption of App functionality
+- Attempting financial transactions through the App
+
+5. FINANCIAL TRANSACTIONS POLICY
+
+5.1 No In-App Payments
+This application strictly does NOT support:
+- Online donations
+- Digital payments
+- Financial transfers
+- Electronic fund transactions
+- Credit/debit card processing
+
+5.2 Official Payment Channels
+All financial matters must be conducted through:
+- Personal transactions at Parish Office
+- Direct bank deposits (with office notification)
+- Check payments at the office
+- Cash offerings during masses/events
+
+5.3 Donation Information
+For donations and financial contributions, please:
+- Visit the Parish Office during office hours
+- Contact parish staff for assistance
+- Use official parish banking channels
+- Request official receipts for transactions
+
+6. INTELLECTUAL PROPERTY
+
+6.1 Parish Content
+All content provided through the App, including:
+- Religious texts and teachings
+- Parish publications
+- Sacramental materials
+- Spiritual resources
+remains the property of San Jose Manggagawa Parish or its licensors.
+
+6.2 User Content
+By submitting content, you grant the Parish a license to use it for parish-related purposes while respecting your privacy and applicable laws.
+
+7. PRIVACY AND DATA PROTECTION
+
+Your use of the App is governed by our Privacy Policy, which explains how we collect, use, and protect your personal information in accordance with:
+- Canon Law requirements
+- Data protection regulations
+- Diocesan policies
+- Catholic ethical standards
+
+8. SACRAMENTAL VALIDITY
+
+The App facilitates sacramental preparation and record-keeping but does not:
+- Replace proper sacramental formation
+- Substitute for personal pastoral care
+- Guarantee sacramental validity
+- Replace canonical requirements
+
+9. LIMITATION OF LIABILITY
+
+San Jose Manggagawa Parish is not liable for:
+- Technical failures or interruptions
+- Errors in displayed information
+- User misconduct or violations
+- Third-party service issues
+- Spiritual outcomes or consequences
+- Financial matters (handled separately through office)
+
+10. TERMINATION
+
+We may suspend or terminate your access for:
+- Violation of these terms
+- Fraudulent or abusive behavior
+- Legal or canonical requirements
+- Parish disciplinary matters
+
+11. DISPUTE RESOLUTION
+
+Any disputes shall be resolved through:
+- Pastoral dialogue and reconciliation
+- Diocesan mediation processes
+- Canonical procedures where applicable
+
+12. MODIFICATIONS TO TERMS
+
+We reserve the right to modify these terms to reflect:
+- Changes in Church teaching
+- Updates to Canon Law
+- Technological improvements
+- User needs and feedback
+
+13. DIOCESAN AUTHORITY
+
+These terms operate under the authority of the Diocese of [Your Diocese Name] and are subject to diocesan review and approval.
+
+14. SPIRITUAL RESPONSIBILITY
+
+Users are expected to:
+- Maintain Christian charity in all interactions
+- Respect Catholic teaching and tradition
+- Support the mission of the Parish
+- Use the App for spiritual growth
+
+15. CONTACT INFORMATION
+
+For questions about these terms, contact:
+San Jose Manggagawa Parish
+Email: sanjosemanggagawawparish@gmail.com   
+Phone: 09674316482
+Address: E. Rodriguez Highway, Cor. E. Manuel St., Brgy. San Jose, Rodriguez, Rizal
+
+16. FINANCIAL OFFICE INFORMATION
+
+For all financial transactions, please visit:
+San Jose Manggagawa Parish Office
+Office Hours: 8am to 12nn & 2pm to 5pm - Tuesday to Saturday
+Location: E. Rodriguez Highway, Cor. E. Manuel St., Brgy. San Jose, Rodriguez, Rizal
+Contact: 09674316482
+
+17. SEVERABILITY
+
+If any provision of these terms is found invalid, the remaining provisions shall remain in full force and effect.
+
+18. GOVERNING LAW
+
+These terms are governed by:
+- Code of Canon Law
+- Catholic Church teaching
+- Applicable civil laws
+- Diocesan statutes
+
+"Let all that you do be done in love." - 1 Corinthians 16:14
+
+By using the San Jose Manggagawa Parish mobile application, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.`;
+  
+    // 🚀 ENHANCED FETCH PROFILE
     const fetchProfile = async () => {
         setLoading(true);
         try {
@@ -188,6 +629,22 @@ const ProfileScreen = () => {
             }
             
             setUser(profileData);
+            
+            // Start animations
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 800,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 600,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                })
+            ]).start();
+            
         } catch (err) {
             console.error("Error fetching profile:", err.message);
             const fallbackUser = JSON.parse(await AsyncStorage.getItem("@userData") || '{}');
@@ -210,20 +667,20 @@ const ProfileScreen = () => {
         }, [])
     );
 
-    // --- FUNCTION: CHANGE PASSWORD ---
+    // 🔐 ENHANCED CHANGE PASSWORD
     const handleChangePassword = async () => {
         if (isUpdatingPassword) return;
 
         if (!oldPassword || !newPassword || !confirmNewPassword) {
-            Alert.alert("Error", "Please fill in all password fields.");
+            Alert.alert("⚠️ Missing Fields", "Please fill in all password fields.");
             return;
         }
         if (newPassword !== confirmNewPassword) {
-            Alert.alert("Error", "New password and confirmation do not match.");
+            Alert.alert("🔒 Password Mismatch", "New password and confirmation do not match.");
             return;
         }
         if (newPassword.length < 6) {
-            Alert.alert("Error", "New password must be at least 6 characters long.");
+            Alert.alert("🔒 Weak Password", "New password must be at least 6 characters long.");
             return;
         }
 
@@ -237,32 +694,32 @@ const ProfileScreen = () => {
             });
 
             if (response.data.success) {
-                Alert.alert("Success", "Your password has been successfully updated!");
+                Alert.alert("🎉 Success", "Your password has been successfully updated!");
                 setModalType('none'); 
                 setOldPassword("");
                 setNewPassword("");
                 setConfirmNewPassword("");
             } else {
-                 Alert.alert("Update Failed", response.data.message || "Could not update password. Please check your current password.");
+                 Alert.alert("❌ Update Failed", response.data.message || "Could not update password. Please check your current password.");
             }
 
         } catch (err) {
             console.error("Password update error:", err.response?.data || err.message);
             Alert.alert(
-                "API Error", 
-                err.response?.data?.message || "Failed to connect to the server or unknown error occurred."
+                "🌐 Connection Error", 
+                err.response?.data?.message || "Failed to connect to the server. Please try again."
             );
         } finally {
             setIsUpdatingPassword(false);
         }
     };
-    
-    // --- FUNCTION: IMAGE PICKER ---
+
+    // 🖼️ ENHANCED IMAGE PICKER
     const handleImageChange = async () => {
         try {
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission required', 'Sorry, we need camera roll permissions to make this work.');
+                Alert.alert('📸 Permission Required', 'We need camera roll permissions to update your profile picture.');
                 return;
             }
 
@@ -270,7 +727,7 @@ const ProfileScreen = () => {
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
                 aspect: [1, 1],
-                quality: 0.7, 
+                quality: 0.8,
             });
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -279,16 +736,16 @@ const ProfileScreen = () => {
             }
         } catch (error) {
             console.error("Image Picker Error:", error);
-            Alert.alert("Error", "Failed to select image.");
+            Alert.alert("❌ Error", "Failed to select image. Please try again.");
         }
     };
 
-    // --- FUNCTION: UPDATE PROFILE DETAILS (COMPLETELY FIXED) ---
+    // 📝 UPDATE PROFILE
     const handleUpdateProfile = async () => {
         if (isProfileUpdating) return;
 
         if (!editedUser.fullName || !editedUser.address || !editedUser.contact) {
-            Alert.alert("Error", "Please fill in all required fields (Name, Address, Contact).");
+            Alert.alert("⚠️ Incomplete Information", "Please fill in all required fields (Name, Address, Contact).");
             return;
         }
         
@@ -297,9 +754,7 @@ const ProfileScreen = () => {
             const isImageNew = editedUser.profileImage.startsWith('file://');
             
             if (isImageNew) {
-                // Use FormData for image upload
                 const formData = new FormData();
-                
                 formData.append('fullName', editedUser.fullName);
                 formData.append('address', editedUser.address);
                 formData.append('contact', editedUser.contact);
@@ -314,24 +769,14 @@ const ProfileScreen = () => {
                     name: filename || 'profile.jpg'
                 });
 
-                console.log("📤 Uploading image with FormData...");
-                
                 const API_URL = `${API_BASE_URL}/api/profile/${user.email}`;
                 const response = await axios.put(API_URL, formData, { 
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
+                    headers: { 'Content-Type': 'multipart/form-data' },
                     timeout: 30000
                 });
 
-                console.log("📥 Server response:", response.data);
-
                 if (response.data && response.data.success) {
-                    // Store the new image locally
-                    await AsyncStorage.setItem(
-                        `${ASYNC_IMAGE_KEY_PREFIX}${user.email}`, 
-                        editedUser.profileImage
-                    );
+                    await AsyncStorage.setItem(`${ASYNC_IMAGE_KEY_PREFIX}${user.email}`, editedUser.profileImage);
                     
                     const updatedData = {
                         fullName: editedUser.fullName,
@@ -340,91 +785,59 @@ const ProfileScreen = () => {
                         profileImage: response.data.user?.profileImage || editedUser.profileImage,
                     };
                     
-                    setUser(prevUser => ({
-                        ...prevUser,
-                        ...updatedData
-                    }));
-                    
-                    const storedUser = JSON.parse(await AsyncStorage.getItem("@userData") || '{}');
+                    setUser(prevUser => ({ ...prevUser, ...updatedData }));
                     await AsyncStorage.setItem("@userData", JSON.stringify({ 
-                        ...storedUser, 
+                        ...JSON.parse(await AsyncStorage.getItem("@userData") || '{}'), 
                         ...updatedData 
                     }));
 
-                    Alert.alert("Success", "Profile successfully updated!");
+                    Alert.alert("🎉 Success", "Profile successfully updated!");
                     setModalType('none');
                 } else {
-                    Alert.alert("Update Failed", response.data?.message || "Could not update profile.");
+                    Alert.alert("❌ Update Failed", response.data?.message || "Could not update profile.");
                 }
             } else {
-                // No image change - use text-only update
-                const textData = {
-                    fullName: editedUser.fullName,
-                    address: editedUser.address,
-                    contact: editedUser.contact,
-                };
-
-                console.log("📤 Updating text data only...");
-
+                const textData = { fullName: editedUser.fullName, address: editedUser.address, contact: editedUser.contact };
                 const API_URL = `${API_BASE_URL}/api/profile/${user.email}`;
                 const response = await axios.put(API_URL, textData, { 
                     headers: { 'Content-Type': 'application/json' },
                     timeout: 15000
                 });
 
-                console.log("📥 Server response:", response.data);
-
                 if (response.data) {
-                    const updatedData = {
-                        ...textData,
-                        profileImage: editedUser.profileImage, 
-                    };
-                    
-                    setUser(prevUser => ({
-                        ...prevUser,
-                        ...updatedData
+                    const updatedData = { ...textData, profileImage: editedUser.profileImage };
+                    setUser(prevUser => ({ ...prevUser, ...updatedData }));
+                    await AsyncStorage.setItem("@userData", JSON.stringify({ 
+                        ...JSON.parse(await AsyncStorage.getItem("@userData") || '{}'), 
+                        ...updatedData 
                     }));
-                    
-                    const storedUser = JSON.parse(await AsyncStorage.getItem("@userData") || '{}');
-                    await AsyncStorage.setItem("@userData", JSON.stringify({ ...storedUser, ...updatedData }));
 
-                    Alert.alert("Success", "Profile successfully updated!");
+                    Alert.alert("🎉 Success", "Profile successfully updated!");
                     setModalType('none');
                 } else {
-                    Alert.alert("Update Failed", response.data?.message || "Could not update profile.");
+                    Alert.alert("❌ Update Failed", response.data?.message || "Could not update profile.");
                 }
             }
 
         } catch (err) {
             console.error("❌ Profile update error:", err);
-            console.error("❌ Error details:", err.response?.data);
-            
-            if (err.code === 'ECONNABORTED') {
-                Alert.alert("Timeout", "The request took too long. Please check your internet connection.");
-            } else if (err.response?.status === 404) {
-                Alert.alert("User Not Found", "Your account was not found. Please try logging in again.");
-            } else if (err.response?.status === 500) {
-                Alert.alert("Server Error", "There's a problem with the server. Please try again later.");
-            } else if (!err.response) {
-                Alert.alert("Network Error", "Cannot connect to the server. Please check your internet connection.");
-            } else {
-                Alert.alert(
-                    "Update Error", 
-                    err.response?.data?.message || "Something went wrong. Please try again."
-                );
-            }
+            Alert.alert("❌ Update Error", err.response?.data?.message || "Something went wrong. Please try again.");
         } finally {
             setIsProfileUpdating(false);
         }
     };
-    
-    // --- FUNCTION: LOG OUT ---
+
+    // 🚪 ENHANCED LOG OUT
     const handleLogout = () => {
         Alert.alert(
-            "Log Out",
+            "🚪 Log Out",
             "Are you sure you want to log out?",
             [
-                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Stay Logged In", 
+                    style: "cancel",
+                    onPress: () => console.log("Cancel Pressed") 
+                },
                 {
                     text: "Yes, Log Out",
                     style: "destructive",
@@ -437,7 +850,7 @@ const ProfileScreen = () => {
                             navigation.replace("Login"); 
                         } catch (err) {
                             console.error("Error logging out:", err);
-                            Alert.alert("Error", "Failed to log out.");
+                            Alert.alert("❌ Error", "Failed to log out. Please try again.");
                         }
                     },
                 },
@@ -445,8 +858,8 @@ const ProfileScreen = () => {
             { cancelable: true }
         );
     };
-    
-    // --- FUNCTION: HANDLE SETTINGS CLICKS ---
+
+    // 🎯 SETTING CLICKS HANDLER
     const handleSettingClick = (key) => {
         if (key === 'changePassword') {
             setModalType('password');
@@ -467,137 +880,206 @@ const ProfileScreen = () => {
         }
     };
 
-    // --- RENDER MODALS ---
+    // ✨ ENHANCED MODAL CONTENT
     const renderModalContent = () => {
         if (modalType === 'password') {
             return (
                 <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Change Password</Text>
+                    <LinearGradient
+                        colors={[COLORS.primary, COLORS.primaryLight]}
+                        style={styles.modalHeader}
+                    >
+                        <Text style={styles.modalTitle}>Change Password</Text>
+                        <TouchableOpacity 
+                            onPress={() => setModalType('none')} 
+                            style={styles.closeIcon}
+                            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                        >
+                            <Ionicons name="close" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </LinearGradient>
                     
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Current Password"
-                        placeholderTextColor={COLORS.textGray}
-                        secureTextEntry={true}
-                        value={oldPassword}
-                        onChangeText={setOldPassword}
-                        editable={!isUpdatingPassword}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="New Password (min 6 characters)"
-                        placeholderTextColor={COLORS.textGray}
-                        secureTextEntry={true}
-                        value={newPassword}
-                        onChangeText={setNewPassword}
-                        editable={!isUpdatingPassword}
-                    />
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Confirm New Password"
-                        placeholderTextColor={COLORS.textGray}
-                        secureTextEntry={true}
-                        value={confirmNewPassword}
-                        onChangeText={setConfirmNewPassword}
-                        editable={!isUpdatingPassword}
-                    />
+                    <View style={styles.inputContainer}>
+                        <Ionicons name="lock-closed" size={20} color={COLORS.primary} style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Current Password"
+                            placeholderTextColor={COLORS.textGray}
+                            secureTextEntry={true}
+                            value={oldPassword}
+                            onChangeText={setOldPassword}
+                            editable={!isUpdatingPassword}
+                        />
+                    </View>
 
-                    <Pressable
-                        style={[styles.saveButton, { backgroundColor: COLORS.primary }]}
+                    <View style={styles.inputContainer}>
+                        <Ionicons name="key" size={20} color={COLORS.primary} style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="New Password (min 6 characters)"
+                            placeholderTextColor={COLORS.textGray}
+                            secureTextEntry={true}
+                            value={newPassword}
+                            onChangeText={setNewPassword}
+                            editable={!isUpdatingPassword}
+                        />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                        <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} style={styles.inputIcon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Confirm New Password"
+                            placeholderTextColor={COLORS.textGray}
+                            secureTextEntry={true}
+                            value={confirmNewPassword}
+                            onChangeText={setConfirmNewPassword}
+                            editable={!isUpdatingPassword}
+                        />
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.saveButton}
                         onPress={handleChangePassword}
                         disabled={isUpdatingPassword}
+                        activeOpacity={0.8}
                     >
-                        {isUpdatingPassword ? (
-                            <ActivityIndicator color={COLORS.cardBackground} />
-                        ) : (
-                            <Text style={styles.saveButtonText}>Update Password</Text>
-                        )}
-                    </Pressable>
+                        <LinearGradient
+                            colors={[COLORS.primary, COLORS.primaryLight]}
+                            style={styles.gradientButton}
+                        >
+                            {isUpdatingPassword ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.saveButtonText}>Update Password</Text>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
 
-                    <Pressable
-                        style={[styles.closeButton, { backgroundColor: COLORS.textGray, marginTop: 10 }]}
+                    <TouchableOpacity
+                        style={[styles.closeButton, { backgroundColor: COLORS.textGray }]}
                         onPress={() => setModalType('none')}
                         disabled={isUpdatingPassword}
+                        activeOpacity={0.8}
                     >
                         <Text style={styles.closeButtonText}>Cancel</Text>
-                    </Pressable>
+                    </TouchableOpacity>
                 </View>
             );
         }
 
         if (modalType === 'profile') {
             return (
-                <ScrollView contentContainerStyle={{ alignItems: 'center' }} style={styles.editProfileScroll}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Edit Profile Details</Text>
-                    
-                    <TouchableOpacity onPress={handleImageChange} disabled={isProfileUpdating} style={styles.imageEditContainer}>
-                        <Image
-                            source={{ uri: editedUser.profileImage || user.profileImage }} 
-                            style={styles.profileImageEdit}
-                        />
-                        <View style={[styles.cameraIconOverlay, { backgroundColor: COLORS.primary }]}>
-                            <Ionicons name="camera-outline" size={24} color={COLORS.cardBackground} />
+                <ScrollView contentContainerStyle={styles.editProfileScroll} style={styles.editProfileContainer}>
+                    <LinearGradient
+                        colors={[COLORS.primary, COLORS.primaryLight]}
+                        style={styles.modalHeader}
+                    >
+                        <Text style={styles.modalTitle}>Edit Profile</Text>
+                        <TouchableOpacity 
+                            onPress={() => setModalType('none')} 
+                            style={styles.closeIcon}
+                            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                        >
+                            <Ionicons name="close" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </LinearGradient>
+
+                    <View style={styles.modalContent}>
+                        <TouchableOpacity 
+                            onPress={handleImageChange} 
+                            disabled={isProfileUpdating} 
+                            style={styles.imageEditContainer}
+                            activeOpacity={0.8}
+                        >
+                            <Image
+                                source={{ uri: editedUser.profileImage || user.profileImage }} 
+                                style={styles.profileImageEdit}
+                            />
+                            <LinearGradient
+                                colors={[COLORS.secondary, '#fbbf24']}
+                                style={styles.cameraIconOverlay}
+                            >
+                                <Ionicons name="camera" size={20} color={COLORS.primary} />
+                            </LinearGradient>
+                            <Text style={styles.imageEditText}>Tap to change photo</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="person" size={20} color={COLORS.primary} style={styles.inputIcon} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Full Name"
+                                placeholderTextColor={COLORS.textGray}
+                                value={editedUser.fullName}
+                                onChangeText={(text) => setEditedUser(prev => ({...prev, fullName: text}))}
+                                editable={!isProfileUpdating}
+                            />
                         </View>
-                        <Text style={[styles.imageEditText, { color: COLORS.primary }]}>Tap to change photo</Text>
-                    </TouchableOpacity>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Full Name"
-                        placeholderTextColor={COLORS.textGray}
-                        value={editedUser.fullName}
-                        onChangeText={(text) => setEditedUser(prev => ({...prev, fullName: text}))}
-                        editable={!isProfileUpdating}
-                    />
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="at" size={20} color={COLORS.textGray} style={styles.inputIcon} />
+                            <TextInput
+                                style={[styles.input, styles.disabledInput]}
+                                placeholder="Email (Cannot be changed)"
+                                placeholderTextColor={COLORS.textGray}
+                                value={user.email} 
+                                editable={false}
+                            />
+                        </View>
 
-                    <TextInput
-                        style={[styles.input, styles.disabledInput]}
-                        placeholder="Email (Cannot be changed)"
-                        placeholderTextColor={COLORS.textGray}
-                        value={user.email} 
-                        editable={false}
-                    />
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="location" size={20} color={COLORS.primary} style={styles.inputIcon} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Address"
+                                placeholderTextColor={COLORS.textGray}
+                                value={editedUser.address}
+                                onChangeText={(text) => setEditedUser(prev => ({...prev, address: text}))}
+                                editable={!isProfileUpdating}
+                            />
+                        </View>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Address"
-                        placeholderTextColor={COLORS.textGray}
-                        value={editedUser.address}
-                        onChangeText={(text) => setEditedUser(prev => ({...prev, address: text}))}
-                        editable={!isProfileUpdating}
-                    />
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="call" size={20} color={COLORS.primary} style={styles.inputIcon} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Contact Number"
+                                placeholderTextColor={COLORS.textGray}
+                                value={editedUser.contact}
+                                onChangeText={(text) => setEditedUser(prev => ({...prev, contact: text}))}
+                                keyboardType="phone-pad"
+                                editable={!isProfileUpdating}
+                            />
+                        </View>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Contact Number"
-                        placeholderTextColor={COLORS.textGray}
-                        value={editedUser.contact}
-                        onChangeText={(text) => setEditedUser(prev => ({...prev, contact: text}))}
-                        keyboardType="phone-pad"
-                        editable={!isProfileUpdating}
-                    />
+                        <TouchableOpacity
+                            style={styles.saveButton}
+                            onPress={handleUpdateProfile}
+                            disabled={isProfileUpdating}
+                            activeOpacity={0.8}
+                        >
+                            <LinearGradient
+                                colors={[COLORS.primary, COLORS.primaryLight]}
+                                style={styles.gradientButton}
+                            >
+                                {isProfileUpdating ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>Save Profile</Text>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
 
-                    <Pressable
-                        style={[styles.saveButton, { backgroundColor: COLORS.primary }]}
-                        onPress={handleUpdateProfile}
-                        disabled={isProfileUpdating}
-                    >
-                        {isProfileUpdating ? (
-                            <ActivityIndicator color={COLORS.cardBackground} />
-                        ) : (
-                            <Text style={styles.saveButtonText}>Save Profile</Text>
-                        )}
-                    </Pressable>
-
-                    <Pressable
-                        style={[styles.closeButton, { backgroundColor: COLORS.textGray, marginTop: 10, marginBottom: 0 }]}
-                        onPress={() => setModalType('none')}
-                        disabled={isProfileUpdating}
-                    >
-                        <Text style={styles.closeButtonText}>Cancel</Text>
-                    </Pressable>
-                </View>
+                        <TouchableOpacity
+                            style={[styles.closeButton, { backgroundColor: COLORS.textGray }]}
+                            onPress={() => setModalType('none')}
+                            disabled={isProfileUpdating}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.closeButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
                 </ScrollView>
             );
         }
@@ -605,14 +1087,17 @@ const ProfileScreen = () => {
         return null; 
     };
 
-    // --- LOADING/ERROR UI ---
+    // ⏳ LOADING SCREEN
     if (loading) {
         return (
             <SafeAreaView style={styles.centered}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={{ marginTop: 10, color: COLORS.textGray }}>
-                    Loading profile...
-                </Text>
+                <LinearGradient
+                    colors={[COLORS.primary, COLORS.primaryLight]}
+                    style={styles.loadingContainer}
+                >
+                    <ActivityIndicator size="large" color="#fff" />
+                    <Text style={styles.loadingText}>Loading your profile...</Text>
+                </LinearGradient>
             </SafeAreaView>
         );
     }
@@ -627,124 +1112,205 @@ const ProfileScreen = () => {
         );
     }
 
-    // --- MAIN RENDER ---
+    // 🎭 MAIN RENDER
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                
-                <LinearGradient
-                    colors={[COLORS.primary, COLORS.primaryLight]}
-                    style={styles.headerBackground}
-                    start={{ x: 0.0, y: 0.1 }}
-                    end={{ x: 1.0, y: 1.0 }}
+            <Animated.ScrollView 
+                style={styles.container} 
+                showsVerticalScrollIndicator={false}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { y: headerScroll } } }],
+                    { useNativeDriver: false }
+                )}
+                scrollEventThrottle={16}
+            >
+                {/* ENHANCED HEADER */}
+                <Animated.View 
+                    style={[
+                        styles.headerBackground,
+                        { 
+                            height: headerHeight,
+                            opacity: headerOpacity
+                        }
+                    ]}
                 >
-                    <View style={styles.headerContent}>
-                        <Image
-                            source={{ uri: user.profileImage }}
-                            style={styles.profileImage}
-                        />
+                    <LinearGradient
+                        colors={[COLORS.primary, COLORS.primaryLight, '#047857']}
+                        style={styles.headerGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <Animated.View 
+                            style={[
+                                styles.headerContent,
+                                { 
+                                    opacity: fadeAnim,
+                                    transform: [{ translateY: slideAnim }] 
+                                }
+                            ]}
+                        >
+                            <View style={styles.profileImageContainer}>
+                                <Image
+                                    source={{ uri: user.profileImage }}
+                                    style={styles.profileImage}
+                                />
+                                <LinearGradient
+                                    colors={['transparent', 'rgba(255,255,255,0.3)']}
+                                    style={styles.imageOverlay}
+                                />
+                            </View>
 
-                        <Text style={styles.userName}>{user.fullName}</Text>
-                        <Text style={styles.userEmail}>{user.email}</Text>
-                        
-                        <TouchableOpacity 
-                            style={styles.editButton} 
-                            onPress={() => handleSettingClick('editProfile')}
-                        > 
-                            <Ionicons
-                                name="create-outline"
-                                size={16}
-                                color={COLORS.primary}
+                            <Text style={styles.userName}>{user.fullName}</Text>
+                            <Text style={styles.userEmail}>{user.email}</Text>
+                            
+                            <TouchableOpacity 
+                                style={styles.editButton} 
+                                onPress={() => handleSettingClick('editProfile')}
+                                activeOpacity={0.8}
+                            > 
+                                <LinearGradient
+                                    colors={[COLORS.secondary, '#fbbf24']}
+                                    style={styles.editButtonGradient}
+                                >
+                                    <Ionicons name="create" size={16} color={COLORS.primary} />
+                                    <Text style={styles.editButtonText}>Edit Profile</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </Animated.View>
+                    </LinearGradient>
+                </Animated.View>
+
+                {/* ENHANCED CONTENT SECTIONS */}
+                <Animated.View 
+                    style={[
+                        styles.contentContainer,
+                        { 
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideAnim }] 
+                        }
+                    ]}
+                >
+                    <View style={styles.sectionCard}>
+                        <View style={styles.sectionHeader}>
+                            <LinearGradient
+                                colors={[COLORS.primary, COLORS.primaryLight]}
+                                style={styles.sectionIcon}
+                            >
+                                <Ionicons name="person-circle" size={20} color="#fff" />
+                            </LinearGradient>
+                            <Text style={styles.sectionTitle}>Account Information</Text>
+                        </View>
+                        {settingOptions.account.map((option, index) => (
+                            <InfoRow
+                                key={index}
+                                label={option.name}
+                                value={user[option.key] || "N/A"}
+                                icon={option.icon}
                             />
-                            <Text style={[styles.editButtonText, { color: COLORS.primary }]}>Edit Profile</Text>
-                        </TouchableOpacity>
+                        ))}
                     </View>
-                </LinearGradient>
 
-                <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Account Information</Text>
-                    {settingOptions.account.map((option, index) => (
+                    <View style={styles.sectionCard}>
+                        <View style={styles.sectionHeader}>
+                            <LinearGradient
+                                colors={[COLORS.warning, '#f59e0b']}
+                                style={styles.sectionIcon}
+                            >
+                                <Ionicons name="shield-checkmark" size={20} color="#fff" />
+                            </LinearGradient>
+                            <Text style={styles.sectionTitle}>Security & Access</Text>
+                        </View>
+                        
                         <InfoRow
-                            key={index}
-                            label={option.name}
-                            value={user[option.key] || "N/A"}
-                            icon={option.icon}
-                        />
-                    ))}
-                </View>
-
-                <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Security & Access</Text>
-                    
-                    <InfoRow
-                        label={"Change Password"}
-                        value={"Manage"}
-                        icon={"lock-closed-outline"}
-                        isClickable={true}
-                        onPress={() => handleSettingClick('changePassword')}
-                    />
-
-                    <InfoRow
-                        label={"Log Out"}
-                        value={"Exit App"}
-                        icon={"log-out-outline"}
-                        isClickable={true}
-                        onPress={handleLogout}
-                    />
-                </View>
-
-                <View style={[styles.sectionCard, { marginBottom: 30 }]}>
-                    <Text style={styles.sectionTitle}>Support & Legal</Text>
-                    
-                    {settingOptions.support.map((option, index) => (
-                        <InfoRow
-                            key={index}
-                            label={option.name}
-                            value={"View"}
-                            icon={option.icon}
+                            label={"Change Password"}
+                            value={"Manage"}
+                            icon={"lock-closed"}
                             isClickable={true}
-                            onPress={() => handleSettingClick(option.key)} 
+                            onPress={() => handleSettingClick('changePassword')}
                         />
-                    ))}
-                </View>
 
-            </ScrollView>
+                        <InfoRow
+                            label={"Log Out"}
+                            value={"Exit App"}
+                            icon={"log-out"}
+                            isClickable={true}
+                            onPress={handleLogout}
+                        />
+                    </View>
 
-            <View style={styles.bottomNav}>
+                    <View style={[styles.sectionCard, { marginBottom: 30 }]}>
+                        <View style={styles.sectionHeader}>
+                            <LinearGradient
+                                colors={[COLORS.success, '#16a34a']}
+                                style={styles.sectionIcon}
+                            >
+                                <Ionicons name="help-buoy" size={20} color="#fff" />
+                            </LinearGradient>
+                            <Text style={styles.sectionTitle}>Support & Legal</Text>
+                        </View>
+                        
+                        {settingOptions.support.map((option, index) => (
+                            <InfoRow
+                                key={index}
+                                label={option.name}
+                                value={"View"}
+                                icon={option.icon}
+                                isClickable={true}
+                                onPress={() => handleSettingClick(option.key)} 
+                            />
+                        ))}
+                    </View>
+                </Animated.View>
+            </Animated.ScrollView>
+
+            {/* ENHANCED BOTTOM NAVIGATION */}
+            <LinearGradient
+                colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
+                style={styles.bottomNav}
+            >
                 <TouchableOpacity
                     onPress={() => navigation.navigate("Home")}
                     style={styles.navItem}
+                    activeOpacity={0.7}
                 >
-                    <Ionicons name="home-outline" size={24} color={COLORS.textGray} />
-                    <Text style={[styles.navText, { color: COLORS.textGray }]}>Home</Text>
+                    <Ionicons name="home" size={22} color={COLORS.textGray} />
+                    <Text style={styles.navText}>Home</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                      onPress={() => navigation.navigate("MyRequests")}
                     style={styles.navItem}
+                    activeOpacity={0.7}
                 >
-                    <Ionicons name="calendar-outline" size={24} color={COLORS.textGray} />
-                    <Text style={[styles.navText, { color: COLORS.textGray }]}>Request Sched</Text>
+                    <Ionicons name="calendar" size={22} color={COLORS.textGray} />
+                    <Text style={styles.navText}>Requests</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={() => navigation.navigate("Profile")}
                     style={styles.navItem}
+                    activeOpacity={0.7}
                 >
-                    <Ionicons name="person" size={24} color={COLORS.primary} />
-                    <Text style={[styles.navTextActive, { color: COLORS.primary }]}>Profile</Text>
+                    <LinearGradient
+                        colors={[COLORS.primary, COLORS.primaryLight]}
+                        style={styles.activeNavIcon}
+                    >
+                        <Ionicons name="person" size={22} color="#fff" />
+                    </LinearGradient>
+                    <Text style={styles.navTextActive}>Profile</Text>
                 </TouchableOpacity>
-            </View>
+            </LinearGradient>
 
+            {/* ENHANCED MODALS */}
             <Modal
                 transparent={true}
                 visible={modalType === 'password' || modalType === 'profile'} 
-                animationType="fade" 
+                animationType="slide"
                 onRequestClose={() => setModalType('none')}
             >
-                <Pressable style={styles.modalContainer} onPress={() => setModalType('none')}>
-                    <Pressable onPress={() => {}} style={styles.modalView}>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalView}>
                         {renderModalContent()}
-                    </Pressable>
-                </Pressable>
+                    </View>
+                </View>
             </Modal>
             
             <PrivacyAndTermsModal
@@ -760,129 +1326,183 @@ const ProfileScreen = () => {
                 isVisible={modalType === 'terms'}
                 onClose={() => setModalType('none')}
             />
-
         </SafeAreaView>
     );
 };
 
-// --- STYLESHEET ---
+// 🎨 PREMIUM GREEN STYLESHEET
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+    container: { 
+        flex: 1, 
+        backgroundColor: COLORS.background 
+    },
     centered: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: COLORS.background,
     },
-    headerBackground: {
-        width: "100%",
-        height: height * 0.3,
+    loadingContainer: {
+        flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        borderBottomLeftRadius: 35,
-        borderBottomRightRadius: 35,
-        marginBottom: 25,
-        paddingTop: 30,
+        width: '100%',
     },
-    headerContent: { alignItems: "center" },
+    loadingText: {
+        color: '#fff',
+        fontSize: 16,
+        marginTop: 10,
+        fontWeight: '600',
+    },
+    headerBackground: {
+        width: "100%",
+        overflow: 'hidden',
+    },
+    headerGradient: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingTop: 50,
+    },
+    headerContent: { 
+        alignItems: "center",
+        paddingHorizontal: 20,
+    },
+    profileImageContainer: {
+        position: 'relative',
+        marginBottom: 15,
+    },
     profileImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 110,
+        height: 110,
+        borderRadius: 60,
         borderWidth: 4,
-        borderColor: COLORS.cardBackground,
-        marginBottom: 10,
-        elevation: 10, 
-        shadowColor: 'rgba(0,0,0,0.5)', 
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.4,
-        shadowRadius: 10,
+        borderColor: 'rgba(255,255,255,0.3)',
+    },
+    imageOverlay: {
+        position: 'absolute',
+        width: 110,
+        height: 110,
+        borderRadius: 60,
+        top: 0,
+        left: 0,
     },
     userName: { 
-        fontSize: 26, 
+        fontSize: 28, 
         fontWeight: "800", 
-        color: COLORS.cardBackground, 
-        textShadowColor: 'rgba(0, 0, 0, 0.15)', 
+        color: '#fff', 
+        textShadowColor: 'rgba(0, 0, 0, 0.3)', 
         textShadowOffset: { width: 1, height: 1 }, 
-        textShadowRadius: 3 
+        textShadowRadius: 5,
+        marginBottom: 4,
     },
     userEmail: {
         fontSize: 14,
-        color: "rgba(255,255,255,0.85)",
-        marginTop: 2,
+        color: "rgba(255,255,255,0.9)",
         fontWeight: '500',
+        marginBottom: 15,
     },
     editButton: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    editButtonGradient: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: COLORS.cardBackground,
-        paddingHorizontal: 18,
-        paddingVertical: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
         borderRadius: 25,
-        marginTop: 15,
-        elevation: 5,
-        shadowColor: COLORS.primary,
+        shadowColor: COLORS.secondary,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 5,
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4,
     },
     editButtonText: {
         marginLeft: 6,
         fontSize: 14,
-        fontWeight: "600",
+        fontWeight: "700",
         color: COLORS.primary, 
+    },
+    contentContainer: {
+        paddingTop: 20,
     },
     sectionCard: {
         backgroundColor: COLORS.cardBackground,
-        marginHorizontal: 15,
-        borderRadius: 12,
-        padding: 15,
+        marginHorizontal: 20,
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.5)',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: 15,
-        shadowColor: COLORS.textDark,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 2,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.borderColor,
+    },
+    sectionIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: "700",
         color: COLORS.textDark,
-        marginBottom: 10,
-        paddingLeft: 5,
-        borderLeftWidth: 3,
-        borderLeftColor: COLORS.primary,
     },
     optionRow: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.borderColor, 
+        borderBottomColor: 'rgba(209, 250, 229, 0.5)', 
+    },
+    logoutRow: {
+        borderBottomWidth: 0,
+        marginTop: 5,
     },
     iconContainer: {
-        width: 35,
-        height: 35,
-        borderRadius: 18,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         justifyContent: "center",
         alignItems: "center",
         marginRight: 15,
-        backgroundColor: 'rgba(5, 102, 141, 0.1)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
     },
     textContainer: {
         flex: 1,
         justifyContent: "center",
     },
     optionLabel: {
-        fontSize: 14,
+        fontSize: 15,
         color: COLORS.textGray,
-        fontWeight: "500",
+        fontWeight: "600",
+        marginBottom: 2,
     },
     optionValue: {
-        fontSize: 15,
-        fontWeight: "600",
+        fontSize: 16,
+        fontWeight: "700",
         color: COLORS.textDark,
-        marginTop: 2,
     },
     bottomNav: {
         flexDirection: "row",
@@ -890,75 +1510,197 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: COLORS.cardBackground,
         borderTopWidth: 1,
-        borderTopColor: COLORS.borderColor,
-        paddingVertical: 10,
+        borderTopColor: 'rgba(209, 250, 229, 0.8)',
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 10,
     },
     navItem: {
         alignItems: "center",
-        padding: 5,
+        padding: 8,
+        flex: 1,
+    },
+    activeNavIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 4,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
     navText: {
         fontSize: 12,
-        fontWeight: "500",
-        marginTop: 4,
+        fontWeight: "600",
+        marginTop: 2,
         color: COLORS.textGray,
     },
     navTextActive: {
         fontSize: 12,
         fontWeight: "700",
-        marginTop: 4,
+        marginTop: 2,
         color: COLORS.primary, 
     },
     modalContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        padding: 20,
     },
     modalView: {
-        margin: 20,
         backgroundColor: COLORS.cardBackground,
-        borderRadius: 15,
-        padding: 20,
-        alignItems: 'center',
+        borderRadius: 25,
+        overflow: 'hidden',
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-        width: '90%',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.3,
+        shadowRadius: 30,
+        elevation: 20,
+        width: '100%',
         maxHeight: '80%',
     },
     legalModalView: {
-        margin: 20,
         backgroundColor: COLORS.cardBackground,
-        borderRadius: 15,
-        padding: 20,
-        alignItems: 'center',
+        borderRadius: 25,
+        overflow: 'hidden',
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-        width: '90%',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.3,
+        shadowRadius: 30,
+        elevation: 20,
+        width: '100%',
         maxHeight: '90%',
     },
-    modalContent: {
-        width: '100%',
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
     },
     modalTitle: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '700',
+        color: '#fff',
+        flex: 1,
+    },
+    closeIcon: {
+        padding: 4,
+    },
+    modalContent: {
+        padding: 20,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.background,
+        borderRadius: 12,
         marginBottom: 15,
+        borderWidth: 1,
+        borderColor: COLORS.borderColor,
+        overflow: 'hidden',
+    },
+    inputIcon: {
+        padding: 15,
+    },
+    input: {
+        flex: 1,
+        height: 50,
+        paddingHorizontal: 10,
+        fontSize: 16,
+        color: COLORS.textDark,
+    },
+    disabledInput: {
+        backgroundColor: '#f1f5f9',
+        color: COLORS.textGray,
+    },
+    saveButton: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: 10,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    gradientButton: {
+        paddingVertical: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    saveButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    closeButton: {
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    closeButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    editProfileContainer: {
+        width: '100%',
+    },
+    editProfileScroll: {
+        paddingBottom: 20,
+    },
+    profileImageEdit: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        marginBottom: 10,
+        borderWidth: 4,
+        borderColor: COLORS.borderColor,
+        alignSelf: 'center',
+    },
+    imageEditContainer: {
+        alignItems: 'center',
+        marginBottom: 25,
+        position: 'relative',
+    },
+    cameraIconOverlay: {
+        position: 'absolute',
+        bottom: 20,
+        right: 10,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: COLORS.cardBackground,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    imageEditText: {
+        fontSize: 13,
+        fontWeight: '600',
         color: COLORS.primary,
-        textAlign: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.borderColor,
-        paddingBottom: 5,
+        marginTop: 5,
     },
     legalScroll: {
-        maxHeight: height * 0.7,
-        paddingHorizontal: 5,
+        maxHeight: height * 0.6,
+        paddingHorizontal: 20,
+        paddingVertical: 15,
     },
     legalText: {
         fontSize: 14,
@@ -967,78 +1709,36 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         textAlign: 'justify',
     },
-    input: {
-        width: '100%',
-        height: 50,
-        backgroundColor: COLORS.background,
-        borderRadius: 10,
-        paddingHorizontal: 15,
-        marginBottom: 15,
-        fontSize: 16,
-        color: COLORS.textDark,
-        borderWidth: 1,
-        borderColor: COLORS.borderColor,
-    },
-    disabledInput: {
-        backgroundColor: COLORS.background,
-        color: COLORS.textGray,
-    },
-    saveButton: {
-        width: '100%',
-        borderRadius: 10,
-        paddingVertical: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    saveButtonText: {
-        color: COLORS.cardBackground,
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    closeButton: {
-        width: '100%',
-        borderRadius: 10,
-        paddingVertical: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    closeButtonText: {
-        color: COLORS.cardBackground,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    editProfileScroll: {
-        width: '100%',
-    },
-    profileImageEdit: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        marginBottom: 10,
-        borderWidth: 3,
-        borderColor: COLORS.borderColor,
-    },
-    imageEditContainer: {
-        alignItems: 'center',
-        marginBottom: 20,
-        position: 'relative',
-    },
-    cameraIconOverlay: {
-        position: 'absolute',
-        bottom: 25,
-        right: 15,
-        width: 35,
-        height: 35,
-        borderRadius: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: COLORS.cardBackground,
-    },
-    imageEditText: {
-        fontSize: 12,
-        fontWeight: '600',
-    }
+    modalFooter: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderColor,
+},
+
+closeDocumentTouchable: {
+    borderRadius: 12,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+},
+
+closeDocumentButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+},
+
+closeDocumentText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+},
 });
 
-export default ProfileScreen;   
+export default ProfileScreen;

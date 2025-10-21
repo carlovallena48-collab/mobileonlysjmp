@@ -130,6 +130,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         return 'wine-outline';
       case 'Funeral Service':
         return 'flower-outline';
+      case 'Sick Call': // ADD SICK CALL ICON
+        return 'medical-outline';
       default:
         return 'calendar-outline';
     }
@@ -432,6 +434,20 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           dateDied: data.dateDied ? formatDate(data.dateDied) : 'Not specified',
         };
       
+      case 'Sick Call': // ADD SICK CALL DETAILS
+        return {
+          ...baseDetails,
+          name: data.fullName || data.name || 'Not specified',
+          date: formatDate(data.dateOfVisit || data.date) || 'Date not set',
+          time: formatTime(data.timeOfVisit || data.time) || 'Time not set',
+          details: `Sick call visit for ${data.fullName || data.name}`,
+          amount: '0', // Sick call is free
+          // Additional sick call details
+          sickness: data.sickness || 'Not specified',
+          contactNumber: data.contactNumber || 'Not specified',
+          email: data.email || 'Not specified',
+        };
+      
       default:
         return baseDetails;
     }
@@ -487,7 +503,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         { url: `${API_URL}/blessing_requests/${email}`, type: 'Blessing' },
         { url: `${API_URL}/holy_orders_requests/${email}`, type: 'Holy Orders' },
         { url: `${API_URL}/first_communion_requests/${email}`, type: 'First Communion' },
-        { url: `${API_URL}/funeral_requests/${email}`, type: 'Funeral Service' }
+        { url: `${API_URL}/funeral_requests/${email}`, type: 'Funeral Service' },
+        { url: `${API_URL}/sickcall_requests/${email}`, type: 'Sick Call' } // ADD SICK CALL ENDPOINT
       ];
 
       let allData = [];
@@ -661,7 +678,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
       'Blessing': 'BlessingForm',
       'Holy Orders': 'HolyOrdersForm',
       'First Communion': 'FirstCommunionForm',
-      'Funeral Service': 'FuneralForm'
+      'Funeral Service': 'FuneralForm',
+      'Sick Call': 'SickCallForm' // ADD SICK CALL ROUTE
     };
 
     const route = formRoutes[sacrament];
@@ -760,6 +778,18 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           details.push(`Parents: ${item.parentsName}`);
         }
         break;
+      
+      case 'Sick Call': // ADD SICK CALL DETAILS
+        if (item.sickness && item.sickness !== 'Not specified') {
+          details.push(`Condition: ${item.sickness}`);
+        }
+        if (item.contactNumber && item.contactNumber !== 'Not specified') {
+          details.push(`Contact: ${item.contactNumber}`);
+        }
+        if (item.email && item.email !== 'Not specified') {
+          details.push(`Email: ${item.email}`);
+        }
+        break;
     }
 
     return details.map((detail, index) => (
@@ -837,6 +867,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
   const renderItemCard = (item, index) => {
     const isHolyOrders = item.sacrament === 'Holy Orders';
     const isFuneralService = item.sacrament === 'Funeral Service';
+    const isSickCall = item.sacrament === 'Sick Call'; // ADD SICK CALL STYLING
     
     return (
       <TouchableOpacity
@@ -844,7 +875,8 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
         style={[
           styles.card,
           isHolyOrders && styles.holyOrdersCard,
-          isFuneralService && styles.funeralCard
+          isFuneralService && styles.funeralCard,
+          isSickCall && styles.sickCallCard // ADD SICK CALL STYLING
         ]}
         onPress={() => handleItemPress(item)}
         activeOpacity={0.8}
@@ -853,7 +885,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
           <Ionicons 
             name={item.icon} 
             size={28} 
-            color={isHolyOrders ? PRIMARY_COLOR : (isFuneralService ? '#7e22ce' : SECONDARY_COLOR)}
+            color={isHolyOrders ? PRIMARY_COLOR : (isFuneralService ? '#7e22ce' : (isSickCall ? '#dc2626' : SECONDARY_COLOR))}
           />
           <View style={styles.titleContainer}>
             <Text style={styles.sacramentName}>{item.sacrament}</Text>
@@ -917,6 +949,16 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
             <Ionicons name="information-circle" size={16} color="#7e22ce" />
             <Text style={styles.specialNoteText}>
               Funeral service request. The parish will contact you for confirmation.
+            </Text>
+          </View>
+        )}
+
+        {/* Special note for Sick Call */}
+        {isSickCall && (
+          <View style={styles.specialNote}>
+            <Ionicons name="information-circle" size={16} color="#dc2626" />
+            <Text style={styles.specialNoteText}>
+              Sick call request. A priest will visit you at the scheduled time.
             </Text>
           </View>
         )}
@@ -1003,6 +1045,7 @@ const ScheduleHistoryScreen = ({ navigation, route }) => {
                   { sacrament: 'Holy Orders', icon: 'person-add-outline' },
                   { sacrament: 'First Communion', icon: 'wine-outline' },
                   { sacrament: 'Funeral Service', icon: 'flower-outline' },
+                  { sacrament: 'Sick Call', icon: 'medical-outline' }, // ADD SICK CALL BUTTON
                 ].map(({ sacrament, icon }) => (
                   <TouchableOpacity 
                     key={sacrament}
@@ -1124,6 +1167,10 @@ const styles = StyleSheet.create({
   funeralCard: {
     borderLeftColor: '#7e22ce',
     backgroundColor: '#faf5ff',
+  },
+  sickCallCard: { // ADD SICK CALL STYLING
+    borderLeftColor: '#dc2626',
+    backgroundColor: '#fef2f2',
   },
   cardHeader: {
     flexDirection: "row",

@@ -15,6 +15,7 @@ import {
   Modal,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Assuming these images are correctly imported
 import annointing from "../assets/annointing.png";
@@ -27,25 +28,29 @@ import matrimony from "../assets/matrimony.png";
 import churchLogo from "../assets/LOGO.png";
 
 const otherservicesIcon = "add-circle-outline";
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
-// 🌈 COLOR PALETTE - Modern & Spiritual
-const PRIMARY_COLOR = "#047857"; // Deep Green (Growth, Life)
-const SECONDARY_COLOR = "#34d399"; // Light Green (Harmony)
-const BACKGROUND_COLOR = "#f5f5f5"; // Very Light Gray/White (Clean canvas)
-const CARD_BACKGROUND = "#ffffff"; // Pure White
+// 🌿 GREEN THEME COLOR PALETTE - Premium Design
+const PRIMARY_COLOR = "#1a5e1a";           // Deep Forest Green
+const PRIMARY_LIGHT = "#2e7d32";          // Medium Green
+const PRIMARY_DARK = "#0d3d0d";           // Dark Green
+const SECONDARY_COLOR = "#f2f2f0ff";        // Gold
+const SECONDARY_LIGHT = "#f0f0eaff";        // Light Gold
+const BACKGROUND_COLOR = "#f8fafc";       // Clean White/Light Gray
+const CARD_BACKGROUND = "#ffffff";        // Pure White
+const TEXT_PRIMARY = "#1e293b";           // Deep Navy
+const TEXT_SECONDARY = "#64748b";         // Slate Gray
 
-// 🎨 UPDATED SACRAMENT COLORS - Paired with the primary theme
-// The 'main' color will be the card's background (lighter), and 'dark' will be for text/icons (stronger)
+// 🎨 UPDATED SACRAMENT COLORS - Green Theme Harmony
 const SACRAMENT_COLORS = {
-  Baptism: { main: "#e0f2fe", dark: "#065f46" }, // Light Blue - Water
-  Eucharist: { main: "#fef3c7", dark: "#92400e" }, // Light Gold - Bread/Wine
-  Reconciliation: { main: "#d1fae5", dark: "#059669" }, // Light Mint - Peace
-  Confirmation: { main: "#fce7f6", dark: "#9d174d" }, // Light Pink/Violet - Spirit
-  Matrimony: { main: "#fee2e2", dark: "#dc2626" }, // Light Red - Love
-  HolyOrders: { main: "#dbeafe", dark: "#1e40af" }, // Light Deep Blue - Calling
-  Annointing: { main: "#fff7ed", dark: "#d97706" }, // Light Orange/Yellow - Oil
-  Other: { main: "#e5e7eb", dark: "#4b5563" }, // Light Gray - General
+  Baptism: { main: "#e0f2fe", dark: "#065f46", gradient: ["#e0f2fe", "#bae6fd"] },
+  Eucharist: { main: "#fef3c7", dark: "#92400e", gradient: ["#fef3c7", "#fde68a"] },
+  Reconciliation: { main: "#d1fae5", dark: "#059669", gradient: ["#d1fae5", "#a7f3d0"] },
+  Confirmation: { main: "#fce7f6", dark: "#9d174d", gradient: ["#fce7f6", "#fbcfe8"] },
+  Matrimony: { main: "#fee2e2", dark: "#dc2626", gradient: ["#fee2e2", "#fecaca"] },
+  HolyOrders: { main: "#dbeafe", dark: "#1e40af", gradient: ["#dbeafe", "#bfdbfe"] },
+  Annointing: { main: "#fff7ed", dark: "#d97706", gradient: ["#fff7ed", "#fed7aa"] },
+  Other: { main: "#e5e7eb", dark: "#4b5563", gradient: ["#e5e7eb", "#d1d5db"] },
 };
 
 const sacraments = [
@@ -59,7 +64,7 @@ const sacraments = [
   { id: "other", name: "Other Services", shortName: "Requests", image: null, route: "OtherServices", colors: SACRAMENT_COLORS.Other },
 ];
 
-// ⬇️ REVERTED TO 3 ITEMS FOR SIMPLICITY ⬇️
+// ⬇️ BOTTOM NAVIGATION ITEMS
 const bottomNavItems = [
   { id: "1", name: "Home", icon: "home-outline", activeIcon: "home", route: "Home" },
   { id: "2", name: "Services", icon: "grid-outline", activeIcon: "grid", route: "Dashboard", active: true },
@@ -84,9 +89,8 @@ const DashboardScreen = ({ navigation }) => {
     else Alert.alert("Service Not Ready", `The form for ${item.name} is not yet available.`);
   };
 
-  // ✅ ETO ANG DINAGDAG KO
+  // ✅ ACTION HANDLERS
   const handleHistoryPress = () => navigation.navigate("ScheduleHistoryScreen");
-  
   const handleCertificatePress = () => navigation.navigate("RequestCertificate");
   const handleViewCertificatePress = () => navigation.navigate("ViewRequestCertificate");
   const handleVolunteerPress = () => navigation.navigate("VolunteerFormScreen");
@@ -94,13 +98,12 @@ const DashboardScreen = ({ navigation }) => {
 
   const handleNavPress = (navItem) => {
     setActiveNav(navItem.route);
-    // Only navigate if it's not the current screen (or implement stack logic)
     if (navItem.route !== activeNav) {
         navigation.navigate(navItem.route);
     }
   };
 
-  // 🖼️ SACRAMENT CARD COMPONENT
+  // 🖼️ ENHANCED SACRAMENT CARD COMPONENT
   const SacramentCard = ({ item }) => {
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const isActive = activeSacrament === item.id;
@@ -118,8 +121,8 @@ const DashboardScreen = ({ navigation }) => {
             styles.sacramentCard,
             {
               backgroundColor: cardBackgroundColor,
-              shadowColor: cardTextColor, // Use the dark color for a distinct shadow
-              borderColor: cardTextColor + '30', // A lighter border
+              shadowColor: cardTextColor,
+              borderColor: cardTextColor + '30',
             },
             isActive && styles.sacramentCardActive,
           ]}
@@ -128,12 +131,12 @@ const DashboardScreen = ({ navigation }) => {
           onPressOut={handlePressOut}
           activeOpacity={0.9}
         >
-          <View
+          <LinearGradient
+            colors={item.colors.gradient}
             style={[
               styles.sacramentIconContainer,
               {
-                backgroundColor: CARD_BACKGROUND,
-                borderColor: cardTextColor + '80', // Stronger border for the icon
+                borderColor: cardTextColor + '80',
                 shadowColor: cardTextColor,
               },
             ]}
@@ -143,7 +146,7 @@ const DashboardScreen = ({ navigation }) => {
             ) : (
               <Image source={item.image} style={styles.sacramentImage} />
             )}
-          </View>
+          </LinearGradient>
           <Text style={[styles.sacramentName, { color: cardTextColor }, isOtherServices && styles.otherServiceName]}>
             {item.name}
           </Text>
@@ -153,7 +156,7 @@ const DashboardScreen = ({ navigation }) => {
     );
   };
 
-  // 🚪 OTHER SERVICES MODAL
+  // 🚪 ENHANCED OTHER SERVICES MODAL
   const OtherServicesModal = () => {
     const handleServiceSelect = (service) => {
       setOtherServicesModalVisible(false);
@@ -177,19 +180,22 @@ const DashboardScreen = ({ navigation }) => {
         name: "Mass Intention",
         icon: "book-outline",
         route: "MassIntention",
-        description: "Request for special masses (Pamisa)"
+        description: "Request for special masses (Pamisa)",
+        color: PRIMARY_COLOR
       },
       {
         name: "Blessing",
         icon: "sparkles-outline",
         route: "Blessing",
-        description: "Blessing of houses, vehicles, or items"
+        description: "Blessing of houses, vehicles, or items",
+        color: SECONDARY_COLOR
       },
       {
         name: "Burial Service",
         icon: "heart-dislike-outline",
         route: "BurialService",
-        description: "Funeral masses and necessary services"
+        description: "Funeral masses and necessary services",
+        color: "#6b7280"
       },
     ];
 
@@ -197,8 +203,16 @@ const DashboardScreen = ({ navigation }) => {
       <Modal animationType="slide" transparent visible={isOtherServicesModalVisible} onRequestClose={() => setOtherServicesModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>More Church Services</Text>
-            <Text style={styles.modalSubtitle}>Select an additional service to request</Text>
+            <LinearGradient
+              colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
+              style={styles.modalHeader}
+            >
+              <Text style={styles.modalTitle}>More Church Services</Text>
+              <Text style={styles.modalSubtitle}>Select an additional service to request</Text>
+              <TouchableOpacity onPress={() => setOtherServicesModalVisible(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </LinearGradient>
 
             <View style={styles.modalButtonContainer}>
               {serviceButtons.map((button, index) => (
@@ -208,9 +222,12 @@ const DashboardScreen = ({ navigation }) => {
                   onPress={() => handleServiceSelect(button.route)}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.serviceIconContainer}>
-                    <Ionicons name={button.icon} size={28} color={PRIMARY_COLOR} />
-                  </View>
+                  <LinearGradient
+                    colors={['#f8fafc', '#f1f5f9']}
+                    style={styles.serviceIconContainer}
+                  >
+                    <Ionicons name={button.icon} size={28} color={button.color} />
+                  </LinearGradient>
                   <View style={styles.serviceTextContainer}>
                     <Text style={styles.serviceButtonTitle}>{button.name}</Text>
                     <Text style={styles.serviceButtonDescription}>{button.description}</Text>
@@ -224,7 +241,12 @@ const DashboardScreen = ({ navigation }) => {
               style={styles.closeButton}
               onPress={() => setOtherServicesModalVisible(false)}
             >
-              <Text style={styles.closeButtonText}>Close</Text>
+              <LinearGradient
+                colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
+                style={styles.gradientButton}
+              >
+                <Text style={styles.closeButtonText}>Close</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -236,10 +258,20 @@ const DashboardScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={PRIMARY_COLOR} />
       
-      {/* HEADER SECTION - More prominent and branded */}
-      <View style={styles.headerContainer}>
+      {/* ENHANCED HEADER SECTION */}
+      <LinearGradient
+        colors={[PRIMARY_COLOR, PRIMARY_LIGHT, PRIMARY_DARK]}
+        style={styles.headerContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
         <View style={styles.headerTopSection}>
-          <Image source={churchLogo} style={styles.logo} />
+          <LinearGradient
+            colors={[SECONDARY_COLOR, SECONDARY_LIGHT]}
+            style={styles.logoContainer}
+          >
+            <Image source={churchLogo} style={styles.logo} />
+          </LinearGradient>
           <View style={styles.parishInfo}>
             <Text style={styles.parishName}>SAN JOSE MANGGAGAWA PARISH</Text>
             <Text style={styles.parishLocation}>Diocese of Antipolo</Text>
@@ -250,7 +282,7 @@ const DashboardScreen = ({ navigation }) => {
           <Text style={styles.dashboardTitle}>Services Dashboard</Text>
           <Text style={styles.dashboardSubtitle}>Book services and manage your requests</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       <View style={styles.contentContainer}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -272,41 +304,49 @@ const DashboardScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* ACTION BUTTONS SECTION */}
+          {/* ENHANCED ACTION BUTTONS SECTION */}
           <View style={styles.buttonsSection}>
             <Text style={styles.actionSectionTitle}>Quick Actions</Text>
             
-            {/* ✅ SCHEDULE HISTORY BUTTON - ETO YUNG HINAHANAP MO */}
+            {/* ✅ SCHEDULE HISTORY BUTTON */}
             <View style={styles.singleButtonRow}>
               <TouchableOpacity 
                 style={[styles.actionButton, styles.historyButton]} 
                 onPress={handleHistoryPress} 
                 activeOpacity={0.9}
               >
-                <Ionicons name="calendar-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                <View style={styles.buttonTextContainer}>
-                  <Text style={styles.actionButtonText}>View Schedule History</Text>
-                  <Text style={styles.actionButtonSubtext}>Check previous service bookings</Text>
-                </View>
-                <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  style={styles.gradientActionButton}
+                >
+                  <Ionicons name="calendar-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
+                  <View style={styles.buttonTextContainer}>
+                    <Text style={styles.actionButtonText}>View Schedule History</Text>
+                    <Text style={styles.actionButtonSubtext}>Check previous service bookings</Text>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-            {/* END OF SCHEDULE HISTORY BUTTON */}
-            
 
             <View style={styles.buttonsRow}>
-              {/* Request Certificate Button - Primary Action */}
+              {/* Request Certificate Button */}
               <TouchableOpacity 
                 style={[styles.actionButton, styles.certificateButton]} 
                 onPress={handleCertificatePress} 
                 activeOpacity={0.9}
               >
-                <Ionicons name="document-text-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                <View style={styles.buttonTextContainer}>
-                  <Text style={styles.actionButtonText}>Request Certificate</Text>
-                  <Text style={styles.actionButtonSubtext}>Baptism, Marriage, etc.</Text>
-                </View>
-                <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                <LinearGradient
+                  colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
+                  style={styles.gradientActionButton}
+                >
+                  <Ionicons name="document-text-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
+                  <View style={styles.buttonTextContainer}>
+                    <Text style={styles.actionButtonText}>Request Certificate</Text>
+                    <Text style={styles.actionButtonSubtext}>Baptism, Marriage, etc.</Text>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                </LinearGradient>
               </TouchableOpacity>
 
               {/* View Certificate Button */}
@@ -315,12 +355,17 @@ const DashboardScreen = ({ navigation }) => {
                 onPress={handleViewCertificatePress} 
                 activeOpacity={0.9}
               >
-                <Ionicons name="eye-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                <View style={styles.buttonTextContainer}>
-                  <Text style={styles.actionButtonText}>View Certificates</Text>
-                  <Text style={styles.actionButtonSubtext}>Check status of requests</Text>
-                </View>
-                <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                <LinearGradient
+                  colors={['#1e40af', '#1e3a8a']}
+                  style={styles.gradientActionButton}
+                >
+                  <Ionicons name="eye-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
+                  <View style={styles.buttonTextContainer}>
+                    <Text style={styles.actionButtonText}>View Certificates</Text>
+                    <Text style={styles.actionButtonSubtext}>Check status of requests</Text>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                </LinearGradient>
               </TouchableOpacity>
             </View>
             
@@ -331,26 +376,36 @@ const DashboardScreen = ({ navigation }) => {
                 onPress={handleVolunteerPress} 
                 activeOpacity={0.9}
               >
-                <Ionicons name="people-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                <View style={styles.buttonTextContainer}>
-                  <Text style={styles.actionButtonText}>Volunteer to Serve</Text>
-                  <Text style={styles.actionButtonSubtext}>Join our church ministries</Text>
-                </View>
-                <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                <LinearGradient
+                  colors={['#f59e0b', '#d97706']}
+                  style={styles.gradientActionButton}
+                >
+                  <Ionicons name="people-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
+                  <View style={styles.buttonTextContainer}>
+                    <Text style={styles.actionButtonText}>Volunteer to Serve</Text>
+                    <Text style={styles.actionButtonSubtext}>Join our church ministries</Text>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                </LinearGradient>
               </TouchableOpacity>
 
-              {/* View Volunteers Button - NEW */}
+              {/* View Volunteers Button */}
               <TouchableOpacity 
                 style={[styles.actionButton, styles.viewVolunteersButton]} 
                 onPress={handleViewVolunteersPress} 
                 activeOpacity={0.9}
               >
-                <Ionicons name="list-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                <View style={styles.buttonTextContainer}>
-                  <Text style={styles.actionButtonText}>My Volunteers</Text>
-                  <Text style={styles.actionButtonSubtext}>View my applications</Text>
-                </View>
-                <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                <LinearGradient
+                  colors={['#7c3aed', '#6d28d9']}
+                  style={styles.gradientActionButton}
+                >
+                  <Ionicons name="list-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
+                  <View style={styles.buttonTextContainer}>
+                    <Text style={styles.actionButtonText}>My Volunteers</Text>
+                    <Text style={styles.actionButtonSubtext}>View my applications</Text>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -361,8 +416,11 @@ const DashboardScreen = ({ navigation }) => {
 
       <OtherServicesModal />
 
-      {/* ⬇️ BOTTOM NAVIGATION - 3 ITEMS ONLY ⬇️ */}
-      <View style={styles.bottomNav}>
+      {/* ENHANCED BOTTOM NAVIGATION */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.98)']}
+        style={styles.bottomNav}
+      >
         {bottomNavItems.map((item) => (
           <TouchableOpacity
             key={item.id}
@@ -370,41 +428,55 @@ const DashboardScreen = ({ navigation }) => {
             onPress={() => handleNavPress(item)}
             activeOpacity={0.7}
           >
-            <Ionicons
-              name={activeNav === item.route ? item.activeIcon : item.icon}
-              size={26} // Slightly bigger icon
-              color={activeNav === item.route ? PRIMARY_COLOR : "#4b5563"}
-            />
+            {activeNav === item.route ? (
+              <LinearGradient
+                colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
+                style={styles.activeNavIcon}
+              >
+                <Ionicons
+                  name={item.activeIcon}
+                  size={24}
+                  color="#fff"
+                />
+              </LinearGradient>
+            ) : (
+              <View style={styles.navIcon}>
+                <Ionicons
+                  name={item.icon}
+                  size={24}
+                  color={TEXT_SECONDARY}
+                />
+              </View>
+            )}
             <Text style={[styles.navText, activeNav === item.route && styles.navTextActive]}>{item.name}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </LinearGradient>
     </SafeAreaView>
   );
 };
 
 export default DashboardScreen;
 
-// --- UPDATED AND ENHANCED STYLESHEET ---
+// --- PREMIUM STYLESHEET WITH GREEN THEME ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: BACKGROUND_COLOR, 
   },
   
-  // 1. HEADER STYLES
+  // 1. ENHANCED HEADER STYLES
   headerContainer: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: height > 800 ? 50 : 30,
     paddingBottom: 30,
-    backgroundColor: PRIMARY_COLOR,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    elevation: 10,
+    borderBottomLeftRadius: 35,
+    borderBottomRightRadius: 35,
+    elevation: 15,
     shadowColor: "#000",
     shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 8 },
   },
   
   headerTopSection: {
@@ -413,14 +485,24 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
 
-  logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: SECONDARY_COLOR,
-    backgroundColor: CARD_BACKGROUND,
+  logoContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+
+  logo: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
 
   parishInfo: {
@@ -432,13 +514,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
 
   parishLocation: {
     fontSize: 13,
-    color: SECONDARY_COLOR, 
+    color: SECONDARY_COLOR,
     fontWeight: '600',
     marginTop: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
 
   dashboardTitleContainer: {
@@ -446,16 +534,22 @@ const styles = StyleSheet.create({
   },
 
   dashboardTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '900',
     color: '#fff',
     marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 4,
   },
 
   dashboardSubtitle: {
     fontSize: 15,
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   
   // 2. CONTENT STYLES
@@ -466,7 +560,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingTop: 25,
-    paddingBottom: 100, 
+    paddingBottom: 100,
   },
 
   section: {
@@ -478,15 +572,16 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#1f2937',
+    color: TEXT_PRIMARY,
     marginBottom: 4,
+    letterSpacing: -0.5,
   },
 
   sectionSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: TEXT_SECONDARY,
     fontWeight: '500',
   },
 
@@ -494,36 +589,36 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-  // 3. SACRAMENT CARD STYLES
+  // 3. ENHANCED SACRAMENT CARD STYLES
   sacramentCard: {
     flex: 1, 
     alignItems: 'center',
-    padding: 18,
+    padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    elevation: 6,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
   },
 
   sacramentIconContainer: {
-    width: 65,
-    height: 65,
+    width: 70,
+    height: 70,
     borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 3,
-    elevation: 5,
-    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowRadius: 8,
   },
 
   sacramentImage: {
-    width: '65%',
-    height: '65%',
+    width: '150%',
+    height: '150%',
     resizeMode: 'contain',
   },
 
@@ -540,131 +635,142 @@ const styles = StyleSheet.create({
   
   sacramentSubtext: {
     fontSize: 11,
-    color: '#6b7280',
+    color: TEXT_SECONDARY,
     textAlign: 'center',
     fontWeight: '600',
     marginTop: 2,
   },
   
-  // 4. ACTION BUTTON STYLES (Color Combination Update)
+  // 4. PREMIUM ACTION BUTTON STYLES
   buttonsSection: {
     marginBottom: 30,
   },
   
   actionSectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#1f2937',
+    color: TEXT_PRIMARY,
     marginBottom: 15,
+    letterSpacing: -0.5,
   },
   
   buttonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
-    marginHorizontal: -5, // Para ma-counter ang marginHorizontal ng actionButton
+    marginHorizontal: -5,
   },
 
-  // Added a specific style for the full-width button row
   singleButtonRow: {
     marginBottom: 12,
-    marginHorizontal: 0, 
+    marginHorizontal: 0,
   },
 
   actionButton: {
     flex: 1,
+    borderRadius: 25,
+    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    marginHorizontal: 5,
+    overflow: 'hidden',
+  },
+
+  gradientActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 15,
-    elevation: 8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    marginHorizontal: 5,
+    padding: 18,
+    borderRadius: 18,
   },
-  
+
   buttonIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
 
-  // 🎨 UPDATED COLOR COMBINATIONS: Used more distinct and high-contrast colors
+  // 🎨 ENHANCED COLOR COMBINATIONS
   historyButton: {
-    // Ginawa kong full width and ginamitan ng Blue color
-    backgroundColor: '#3b82f6', // Bright Blue for History/Tracking
-    shadowColor: '#3b82f6',
-    marginHorizontal: 0, // Inalis ang side margin para maging full width sa loob ng section padding
-    padding: 20, // Slightly bigger padding
+    marginHorizontal: 0,
   },
 
-  volunteerButton: {
-    backgroundColor: '#f59e0b', // Amber/Orange for Action/Opportunity
-    shadowColor: '#f59e0b',
-  },
-
-  certificateButton: {
-    backgroundColor: PRIMARY_COLOR, // Deep Green (Primary Action)
-    shadowColor: PRIMARY_COLOR,
-  },
-
-  viewCertificateButton: {
-    backgroundColor: '#1e40af', // Deep Blue for tracking/status
-    shadowColor: '#1e40af',
-  },
-
-  viewVolunteersButton: {
-    backgroundColor: '#7c3aed', // Purple for volunteer history
-    shadowColor: '#7c3aed',
-  },
+  volunteerButton: {},
+  certificateButton: {},
+  viewCertificateButton: {},
+  viewVolunteersButton: {},
 
   buttonTextContainer: {
     flex: 1,
   },
 
   actionButtonText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: CARD_BACKGROUND,
-    marginBottom: 2,
+    marginBottom: 3,
+    letterSpacing: -0.3,
   },
 
   actionButtonSubtext: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 14,
+    fontWeight: '500',
   },
 
-  // 5. BOTTOM NAV STYLES (Adjusted for 3 items)
+  // 5. PREMIUM BOTTOM NAV STYLES
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 10,
-    backgroundColor: CARD_BACKGROUND,
-    borderTopWidth: 0,
-    elevation: 20, 
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -5 },
     shadowOpacity: 0.15,
     shadowRadius: 15,
-    paddingBottom: Dimensions.get('window').height > 800 ? 25 : 10, 
+    paddingBottom: height > 800 ? 25 : 12,
   },
 
   navItem: {
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderRadius: 12,
-    flex: 1, // Equally distributes 3 items
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 16,
+    flex: 1,
   },
 
   navItemActive: {
-    backgroundColor: SECONDARY_COLOR + '20', 
+    // Background handled by gradient icon
+  },
+
+  navIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+
+  activeNavIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+    shadowColor: PRIMARY_COLOR,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
 
   navText: {
     fontSize: 11,
-    marginTop: 4,
-    color: '#4b5563',
+    marginTop: 2,
+    color: TEXT_SECONDARY,
     fontWeight: '600',
   },
 
@@ -673,86 +779,135 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   
-  // 6. MODAL STYLES
+  // 6. PREMIUM MODAL STYLES
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
+  
   modalContent: {
     width: '100%',
     backgroundColor: CARD_BACKGROUND,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    padding: 30,
-    alignItems: 'center',
     elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    maxHeight: height * 0.85,
   },
+  
+  modalHeader: {
+    padding: 30,
+    paddingBottom: 20,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    position: 'relative',
+  },
+  
   modalTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
-    color: PRIMARY_COLOR,
+    color: '#fff',
     marginBottom: 5,
-  },
-  modalSubtitle: {
-    fontSize: 15,
-    color: '#6b7280',
-    marginBottom: 25,
     textAlign: 'center',
   },
-  modalButtonContainer: {
-    width: '100%',
-    marginBottom: 20,
+  
+  modalSubtitle: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    fontWeight: '500',
   },
+  
+  modalCloseButton: {
+    position: 'absolute',
+    top: 25,
+    right: 25,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  
+  modalButtonContainer: {
+    padding: 25,
+    paddingBottom: 20,
+  },
+  
   serviceButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 15,
-    marginBottom: 10,
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 12,
     backgroundColor: '#f9fafb',
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
+  
   serviceIconContainer: {
-    width: 45,
-    height: 45,
-    borderRadius: 10,
-    backgroundColor: BACKGROUND_COLOR,
+    width: 50,
+    height: 50,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
+  
   serviceTextContainer: {
     flex: 1,
   },
+  
   serviceButtonTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 2,
+    color: TEXT_PRIMARY,
+    marginBottom: 3,
+    letterSpacing: -0.3,
   },
+  
   serviceButtonDescription: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: TEXT_SECONDARY,
     lineHeight: 16,
+    fontWeight: '500',
   },
+  
   closeButton: {
-    paddingVertical: 15,
-    backgroundColor: PRIMARY_COLOR,
-    borderRadius: 15,
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 10,
+    margin: 25,
+    marginTop: 0,
+    borderRadius: 18,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: PRIMARY_COLOR,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
+  
+  gradientButton: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+  },
+  
   closeButtonText: {
     fontSize: 16,
     color: CARD_BACKGROUND,
     fontWeight: '700',
+    letterSpacing: 0.5,
   }
 });

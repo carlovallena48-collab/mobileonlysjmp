@@ -47,46 +47,50 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState("");
+  const [currentUserData, setCurrentUserData] = useState(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
-  // Get user email from multiple sources
-  const getUserEmail = async () => {
+  // Get currently logged-in user data
+  const getCurrentUserData = async () => {
     try {
-      console.log('🔍 [VOLUNTEER HISTORY] Getting user email...');
+      console.log('🔍 [VOLUNTEER HISTORY] Getting current user data...');
       
-      // 1. Try from navigation params first
-      const paramsEmail = route.params?.userEmail;
-      if (paramsEmail) {
-        console.log('✅ [VOLUNTEER HISTORY] Got email from params:', paramsEmail);
-        setUserEmail(paramsEmail);
-        return paramsEmail;
-      }
-
-      // 2. Try from route.params.userData
-      const userDataEmail = route.params?.userData?.email;
-      if (userDataEmail) {
-        console.log('✅ [VOLUNTEER HISTORY] Got email from userData:', userDataEmail);
-        setUserEmail(userDataEmail);
-        return userDataEmail;
-      }
-
-      // 3. Try AsyncStorage as fallback
+      // 1. Try from AsyncStorage first (most reliable)
       const storedUser = await AsyncStorage.getItem('@userData');
       if (storedUser) {
         const userData = JSON.parse(storedUser);
         if (userData.email) {
-          console.log('✅ [VOLUNTEER HISTORY] Got email from AsyncStorage:', userData.email);
+          console.log('✅ [VOLUNTEER HISTORY] Got user data from AsyncStorage:', userData.email);
           setUserEmail(userData.email);
-          return userData.email;
+          setCurrentUserData(userData);
+          return userData;
         }
       }
 
-      console.log('❌ [VOLUNTEER HISTORY] No user email found anywhere');
+      // 2. Try from navigation params
+      const paramsEmail = route.params?.userEmail;
+      const paramsUserData = route.params?.userData;
+      
+      if (paramsEmail) {
+        console.log('✅ [VOLUNTEER HISTORY] Got email from params:', paramsEmail);
+        setUserEmail(paramsEmail);
+        setCurrentUserData(paramsUserData || { email: paramsEmail });
+        return { email: paramsEmail, ...paramsUserData };
+      }
+
+      if (paramsUserData?.email) {
+        console.log('✅ [VOLUNTEER HISTORY] Got user data from params:', paramsUserData.email);
+        setUserEmail(paramsUserData.email);
+        setCurrentUserData(paramsUserData);
+        return paramsUserData;
+      }
+
+      console.log('❌ [VOLUNTEER HISTORY] No user data found anywhere');
       return null;
     } catch (error) {
-      console.error('❌ [VOLUNTEER HISTORY] Error getting user email:', error);
+      console.error('❌ [VOLUNTEER HISTORY] Error getting user data:', error);
       return null;
     }
   };
@@ -96,14 +100,13 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
     console.log('📧 Route params:', route.params);
     
     const initializeData = async () => {
-      const email = await getUserEmail();
-      if (email) {
-        console.log('📧 User email found:', email);
-        await loadVolunteerData(email);
+      const userData = await getCurrentUserData();
+      if (userData && userData.email) {
+        console.log('📧 Current user email found:', userData.email);
+        await loadVolunteerData(userData.email);
       } else {
-        console.log('❌ No user email found');
+        console.log('❌ No user data found');
         setLoading(false);
-        // Show user-friendly message instead of alert
       }
     };
 
@@ -127,17 +130,19 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       
+      // Always use the currently logged-in user's email
       const userEmailToUse = email || userEmail;
       
       if (!userEmailToUse) {
-        console.log('❌ No user email provided');
+        console.log('❌ No user email available');
         setLoading(false);
         return;
       }
 
-      console.log(`🔍 Loading volunteer applications for: ${userEmailToUse}`);
+      console.log(`🔍 Loading ALL volunteer applications to filter for: ${userEmailToUse}`);
       
-      const API_URL = `${API_BASE_URL}/api/volunteer-applications/${encodeURIComponent(userEmailToUse)}`;
+      // CHANGED: Use the main endpoint and filter on frontend
+      const API_URL = `${API_BASE_URL}/api/volunteer-applications`;
       console.log(`🌐 API URL: ${API_URL}`);
       
       const response = await fetch(API_URL, {
@@ -150,17 +155,25 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
       console.log(`📡 Response status: ${response.status}`);
       
       if (response.ok) {
-        const applications = await response.json();
-        console.log(`✅ Loaded ${applications.length} volunteer applications`);
+        const allApplications = await response.json();
+        console.log(`✅ Loaded ${allApplications.length} total volunteer applications`);
+        
+        // CHANGED: Filter applications submitted by current user
+        const userApplications = allApplications.filter(app => 
+          app.submittedByEmail && app.submittedByEmail.toLowerCase() === userEmailToUse.toLowerCase()
+        );
+        
+        console.log(`✅ Found ${userApplications.length} applications submitted by ${userEmailToUse}`);
+        console.log('📋 User applications:', userApplications);
         
         // Sort by date (newest first)
-        const sortedApplications = applications.sort((a, b) => 
+        const sortedApplications = userApplications.sort((a, b) => 
           new Date(b.createdAt || b.applicationDate) - new Date(a.createdAt || a.applicationDate)
         );
         
         setVolunteerApplications(sortedApplications);
       } else if (response.status === 404) {
-        console.log('📭 No applications found for this user');
+        console.log('📭 No applications found');
         setVolunteerApplications([]);
       } else {
         const errorText = await response.text();
@@ -203,6 +216,7 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
       case 'approved': return '#10b981';
       case 'pending': return '#f59e0b';
       case 'rejected': return '#ef4444';
+      case 'in-process': return '#3b82f6';
       default: return '#6b7280';
     }
   };
@@ -212,6 +226,7 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
       case 'approved': return 'checkmark-circle';
       case 'pending': return 'time';
       case 'rejected': return 'close-circle';
+      case 'in-process': return 'sync';
       default: return 'help-circle';
     }
   };
@@ -223,7 +238,9 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
       return date.toLocaleDateString('en-PH', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
     } catch (error) {
       return 'Invalid date';
@@ -248,80 +265,92 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
     }
   };
 
-  const VolunteerCard = ({ application, index }) => (
-    <Animated.View 
-      style={[
-        styles.volunteerCard,
-        {
-          opacity: fadeAnim,
-          transform: [
-            { translateY: slideAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, -10 * index]
-            })}
-          ]
-        }
-      ]}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.ministryInfo}>
-          <View style={[
-            styles.ministryIconContainer,
-            { backgroundColor: getStatusColor(application.status) + '20' }
-          ]}>
+  const VolunteerCard = ({ application, index }) => {
+    return (
+      <Animated.View 
+        style={[
+          styles.volunteerCard,
+          {
+            opacity: fadeAnim,
+            transform: [
+              { translateY: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, -10 * index]
+              })}
+            ]
+          }
+        ]}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.ministryInfo}>
+            <View style={[
+              styles.ministryIconContainer,
+              { backgroundColor: getStatusColor(application.status) + '20' }
+            ]}>
+              <Ionicons 
+                name={SERVER_ICONS[application.ministry] || 'help-circle'} 
+                size={24} 
+                color={getStatusColor(application.status)} 
+              />
+            </View>
+            <View style={styles.ministryText}>
+              <Text style={styles.ministryName} numberOfLines={1}>
+                {application.ministry}
+              </Text>
+              <Text style={styles.applicationDate}>
+                Applied {getTimeAgo(application.applicationDate)}
+              </Text>
+              <Text style={styles.requestNumber}>{application.requestNumber}</Text>
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(application.status) + '20' }]}>
             <Ionicons 
-              name={SERVER_ICONS[application.ministry] || 'help-circle'} 
-              size={24} 
+              name={getStatusIcon(application.status)} 
+              size={16} 
               color={getStatusColor(application.status)} 
             />
-          </View>
-          <View style={styles.ministryText}>
-            <Text style={styles.ministryName} numberOfLines={1}>
-              {application.ministry}
+            <Text style={[styles.statusText, { color: getStatusColor(application.status) }]}>
+              {application.status?.charAt(0)?.toUpperCase() + application.status?.slice(1) || 'Pending'}
             </Text>
-            <Text style={styles.applicationDate}>
-              Applied {getTimeAgo(application.applicationDate)}
-            </Text>
-            <Text style={styles.requestNumber}>{application.requestNumber}</Text>
           </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(application.status) + '20' }]}>
-          <Ionicons 
-            name={getStatusIcon(application.status)} 
-            size={16} 
-            color={getStatusColor(application.status)} 
-          />
-          <Text style={[styles.statusText, { color: getStatusColor(application.status) }]}>
-            {application.status?.charAt(0)?.toUpperCase() + application.status?.slice(1) || 'Pending'}
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.cardBody}>
-        <View style={styles.infoRow}>
-          <Ionicons name="person-outline" size={16} color="#6b7280" />
-          <Text style={styles.infoText} numberOfLines={1}>{application.fullName}</Text>
+        <View style={styles.cardBody}>
+          <View style={styles.infoRow}>
+            <Ionicons name="person-outline" size={16} color="#6b7280" />
+            <Text style={styles.infoText} numberOfLines={1}>{application.fullName}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="mail-outline" size={16} color="#6b7280" />
+            <Text style={styles.infoText} numberOfLines={1}>
+              {application.email}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="call-outline" size={16} color="#6b7280" />
+            <Text style={styles.infoText}>{application.contactNumber}</Text>
+          </View>
+          
+          {/* Show who submitted this application */}
+          <View style={styles.infoRow}>
+            <Ionicons name="person-circle-outline" size={16} color="#6b7280" />
+            <Text style={styles.submittedByText}>
+              Submitted by: {application.submittedByEmail || userEmail}
+            </Text>
+          </View>
         </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="mail-outline" size={16} color="#6b7280" />
-          <Text style={styles.infoText} numberOfLines={1}>{application.email}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="call-outline" size={16} color="#6b7280" />
-          <Text style={styles.infoText}>{application.contactNumber}</Text>
-        </View>
-      </View>
 
-      <TouchableOpacity 
-        style={styles.detailsButton}
-        onPress={() => handleViewDetails(application)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.detailsButtonText}>View Details</Text>
-        <Feather name="arrow-right" size={16} color={PRIMARY_COLOR} />
-      </TouchableOpacity>
-    </Animated.View>
-  );
+        <TouchableOpacity 
+          style={styles.detailsButton}
+          onPress={() => handleViewDetails(application)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.detailsButtonText}>View Details</Text>
+          <Feather name="arrow-right" size={16} color={PRIMARY_COLOR} />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   const DetailModal = () => (
     <Modal
@@ -348,6 +377,14 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
               style={styles.modalContent}
               showsVerticalScrollIndicator={false}
             >
+              {/* Current user info */}
+              <View style={styles.userInfoBanner}>
+                <Ionicons name="person-circle" size={20} color={PRIMARY_COLOR} />
+                <Text style={styles.userInfoText}>
+                  Viewing as: {userEmail}
+                </Text>
+              </View>
+
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>Ministry Information</Text>
                 <View style={styles.detailRow}>
@@ -374,18 +411,24 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailSectionTitle}>Personal Information</Text>
+                <Text style={styles.detailSectionTitle}>Application Information</Text>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Full Name:</Text>
                   <Text style={styles.detailValue}>{selectedApplication.fullName}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Email:</Text>
+                  <Text style={styles.detailLabel}>Contact Email:</Text>
                   <Text style={styles.detailValue}>{selectedApplication.email}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Contact:</Text>
+                  <Text style={styles.detailLabel}>Contact Number:</Text>
                   <Text style={styles.detailValue}>{selectedApplication.contactNumber}</Text>
+                </View>
+                
+                {/* Submitted By information */}
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Submitted By:</Text>
+                  <Text style={styles.detailValue}>{selectedApplication.submittedByEmail || userEmail}</Text>
                 </View>
               </View>
 
@@ -457,8 +500,8 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
 
   const handleVolunteerNow = () => {
     navigation.navigate('VolunteerFormScreen', { 
-      userEmail,
-      userData: route.params?.userData 
+      userEmail: userEmail,
+      userData: currentUserData 
     });
   };
 
@@ -500,7 +543,7 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
           <Ionicons name="people-outline" size={80} color="#d1d5db" />
           <Text style={styles.centeredTitle}>No Applications Yet</Text>
           <Text style={styles.centeredText}>
-            You haven't applied to any ministries yet. Start your journey by volunteering to serve.
+            You haven't submitted any volunteer applications yet. Start your journey by volunteering to serve.
           </Text>
           <TouchableOpacity 
             style={styles.primaryButton}
@@ -512,8 +555,8 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
           
           {/* Debug Info */}
           <View style={styles.debugInfo}>
-            <Text style={styles.debugText}>Debug Info:</Text>
-            <Text style={styles.debugText}>User: {userEmail}</Text>
+            <Text style={styles.debugText}>Current User: {userEmail}</Text>
+            <Text style={styles.debugText}>Your Applications: {volunteerApplications.length}</Text>
             <Text style={styles.debugText}>Server: {API_BASE_URL}</Text>
           </View>
         </View>
@@ -542,7 +585,7 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Your Applications ({volunteerApplications.length})</Text>
+        <Text style={styles.sectionTitle}>Applications You Submitted ({volunteerApplications.length})</Text>
         
         {volunteerApplications.map((application, index) => (
           <VolunteerCard 
@@ -571,7 +614,7 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>My Volunteer Applications</Text>
           <Text style={styles.headerSubtitle}>
-            {userEmail ? `Logged in as ${userEmail}` : 'Track your ministry applications'}
+            {userEmail ? `Applications submitted by ${userEmail}` : 'Track your ministry applications'}
           </Text>
         </View>
         <TouchableOpacity 
@@ -619,6 +662,8 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
     </SafeAreaView>
   );
 };
+
+// ... (styles remain the same, just copy from your existing code) ...
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -835,6 +880,12 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
+  submittedByText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 8,
+    fontStyle: 'italic',
+  },
   detailsButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -886,6 +937,20 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: 20,
+  },
+  userInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  userInfoText: {
+    fontSize: 14,
+    color: PRIMARY_COLOR,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   detailSection: {
     marginBottom: 20,

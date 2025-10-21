@@ -2,59 +2,44 @@ import React, { useState, useEffect } from 'react';
 import {
     View, Text, ScrollView, TouchableOpacity,
     StyleSheet, RefreshControl, Alert,
-    Dimensions, Platform, Animated
+    Dimensions, Platform, Animated, StatusBar
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
-// 🎨 ENHANCED COLOR PALETTE
+// 🎨 MODERN COLOR PALETTE
 const Colors = {
-    // Primary Colors
-    primary: '#2E7D32',
-    primaryLight: '#4CAF50',
-    primaryDark: '#1B5E20',
-    
-    // Background Colors
-    background: '#F8FDF8',
-    cardBackground: '#FFFFFF',
-    
-    // Text Colors
-    textPrimary: '#1B5E20',
-    textSecondary: '#4E6352',
-    textLight: '#78957C',
-    textWhite: '#FFFFFF',
-    
-    // Status Colors
-    success: '#4CAF50',
-    warning: '#FF9800',
-    error: '#F44336',
-    info: '#2196F3',
-    
-    // UI Colors
-    border: '#E8F5E9',
-    shadow: 'rgba(46, 125, 50, 0.1)',
-    
-    // Notification Type Colors
-    approved: '#4CAF50',
-    pending: '#FF9800',
-    rejected: '#F44336',
-    submitted: '#2196F3',
-    reminder: '#9C27B0',
-    cancelled: '#795548'
+    primary: '#2563eb',
+    primaryLight: '#3b82f6',
+    primaryDark: '#1d4ed8',
+    background: '#f8fafc',
+    cardBackground: '#ffffff',
+    textPrimary: '#1e293b',
+    textSecondary: '#64748b',
+    textLight: '#94a3b8',
+    textWhite: '#ffffff',
+    approved: '#10b981',
+    rejected: '#ef4444',
+    border: '#e2e8f0',
+    shadow: 'rgba(37, 99, 235, 0.1)',
+    gradientStart: '#2563eb',
+    gradientEnd: '#3b82f6',
 };
 
 const NOTIFICATION_STORAGE_KEY = '@notificationHistory';
+const API_BASE_URL = "http://192.168.100.199:5000";
 
 export default function NotificationScreen({ navigation }) {
     const [notifications, setNotifications] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
-    const [filter, setFilter] = useState('all');
+    const [userEmail, setUserEmail] = useState('');
     const fadeAnim = useState(new Animated.Value(0))[0];
+    const [activeFilter, setActiveFilter] = useState('all');
 
-    // Load notifications on component mount
     useEffect(() => {
+        loadUserData();
         loadNotifications();
         animateHeader();
     }, []);
@@ -67,25 +52,198 @@ export default function NotificationScreen({ navigation }) {
         }).start();
     };
 
-    const loadNotifications = async () => {
+    const loadUserData = async () => {
         try {
-            const storedNotifications = await AsyncStorage.getItem(NOTIFICATION_STORAGE_KEY);
-            if (storedNotifications) {
-                const parsedNotifications = JSON.parse(storedNotifications);
-                const sortedNotifications = parsedNotifications.sort((a, b) => 
-                    new Date(b.timestamp) - new Date(a.timestamp)
-                );
-                setNotifications(sortedNotifications);
+            const storedUser = await AsyncStorage.getItem('@userData');
+            if (storedUser) {
+                const userData = JSON.parse(storedUser);
+                setUserEmail(userData.email);
             }
         } catch (error) {
-            console.error('Error loading notifications:', error);
+            console.error('Error loading user data:', error);
         }
     };
 
+    const loadNotifications = async () => {
+        try {
+            setRefreshing(true);
+            
+            const storedNotifications = await AsyncStorage.getItem(NOTIFICATION_STORAGE_KEY);
+            let parsedNotifications = storedNotifications ? JSON.parse(storedNotifications) : [];
+            
+            if (userEmail) {
+                const approvedRequests = await fetchApprovedRequests();
+                const rejectedRequests = await fetchRejectedRequests();
+                
+                const allNotifications = mergeNotifications(parsedNotifications, [
+                    ...approvedRequests,
+                    ...rejectedRequests
+                ]);
+                
+                const sortedNotifications = allNotifications.sort((a, b) => 
+                    new Date(b.timestamp) - new Date(a.timestamp)
+                );
+                
+                setNotifications(sortedNotifications);
+                await AsyncStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(sortedNotifications));
+            } else {
+                setNotifications(parsedNotifications);
+            }
+        } catch (error) {
+            console.error('Error loading notifications:', error);
+            const storedNotifications = await AsyncStorage.getItem(NOTIFICATION_STORAGE_KEY);
+            if (storedNotifications) {
+                setNotifications(JSON.parse(storedNotifications));
+            }
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    const safeFetchSacramentRequests = async (collectionName, status) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/${collectionName}`);
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    return [];
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const requests = await response.json();
+            const userRequests = requests.filter(request => 
+                request.submittedByEmail === userEmail && 
+                request.status === status
+            );
+            
+            return userRequests;
+            
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const fetchApprovedRequests = async () => {
+        try {
+            const availableEndpoints = [
+                'baptismrequests', 
+                'kumpil_requests',
+                'marriage_requests',
+                'pamisa_requests',
+                'blessing_requests',
+                'holy_orders_requests',
+                'first_communion_requests',
+                'funeral_requests',
+                'volunteer-applications',
+                'certificate-requests'
+            ];
+
+            const sacramentRequests = await Promise.all(
+                availableEndpoints.map(endpoint => 
+                    safeFetchSacramentRequests(endpoint, 'approved')
+                )
+            );
+
+            const allApprovedRequests = sacramentRequests.flat();
+            return convertToNotifications(allApprovedRequests, 'approved');
+
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const fetchRejectedRequests = async () => {
+        try {
+            const availableEndpoints = [
+                'baptismrequests', 
+                'kumpil_requests',
+                'marriage_requests',
+                'pamisa_requests',
+                'blessing_requests',
+                'holy_orders_requests',
+                'first_communion_requests',
+                'funeral_requests',
+                'volunteer-applications',
+                'certificate-requests'
+            ];
+
+            const sacramentRequests = await Promise.all(
+                availableEndpoints.map(endpoint => 
+                    safeFetchSacramentRequests(endpoint, 'rejected')
+                )
+            );
+
+            const allRejectedRequests = sacramentRequests.flat();
+            return convertToNotifications(allRejectedRequests, 'rejected');
+
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const convertToNotifications = (requests, status) => {
+        return requests.map(request => {
+            const baseNotification = {
+                id: request._id || request.requestNumber || `notif-${Date.now()}-${Math.random()}`,
+                type: status,
+                timestamp: request.lastUpdated || request.createdAt || new Date(),
+                read: false,
+                data: request
+            };
+
+            const getSacramentDisplayName = (sacrament) => {
+                const names = {
+                    'Baptism': 'Baptism',
+                    'Kumpil': 'Confirmation',
+                    'Marriage': 'Marriage',
+                    'Funeral Service': 'Funeral Service',
+                    'Pamisa': 'Mass Intention',
+                    'Blessing': 'Blessing',
+                    'Holy Orders': 'Holy Orders',
+                    'First Communion': 'First Communion',
+                    'Volunteer': 'Volunteer',
+                    'Certificate': 'Certificate'
+                };
+                return names[sacrament] || sacrament || 'Request';
+            };
+
+            const sacramentName = getSacramentDisplayName(request.sacrament);
+            
+            if (status === 'approved') {
+                return {
+                    ...baseNotification,
+                    message: `${sacramentName} request has been approved`,
+                    sacrament: sacramentName
+                };
+            } else {
+                return {
+                    ...baseNotification,
+                    message: `${sacramentName} request has been declined`,
+                    sacrament: sacramentName
+                };
+            }
+        });
+    };
+
+    const mergeNotifications = (existingNotifications, newNotifications) => {
+        const notificationMap = new Map();
+        
+        existingNotifications.forEach(notification => {
+            notificationMap.set(notification.id, notification);
+        });
+        
+        newNotifications.forEach(notification => {
+            if (!notificationMap.has(notification.id)) {
+                notificationMap.set(notification.id, notification);
+            }
+        });
+        
+        return Array.from(notificationMap.values());
+    };
+
     const onRefresh = async () => {
-        setRefreshing(true);
         await loadNotifications();
-        setRefreshing(false);
     };
 
     const markAsRead = async (notificationId) => {
@@ -166,91 +324,71 @@ export default function NotificationScreen({ navigation }) {
         );
     };
 
-    // 🎨 ENHANCED NOTIFICATION STYLING FUNCTIONS
     const getNotificationConfig = (type) => {
-        const configs = {
-            approved: {
+        if (type === 'approved') {
+            return {
                 icon: 'check-circle',
                 color: Colors.approved,
-                bgColor: '#E8F5E9',
-                title: 'Approved',
-                gradient: ['#E8F5E9', '#F1F8E9']
-            },
-            pending: {
-                icon: 'clock',
-                color: Colors.pending,
-                bgColor: '#FFF3E0',
-                title: 'Under Review',
-                gradient: ['#FFF3E0', '#FFF8E1']
-            },
-            rejected: {
+                bgColor: '#f0fdf4',
+                iconBg: '#dcfce7',
+            };
+        } else {
+            return {
                 icon: 'x-circle',
                 color: Colors.rejected,
-                bgColor: '#FFEBEE',
-                title: 'Update Required',
-                gradient: ['#FFEBEE', '#FCE4EC']
-            },
-            submitted: {
-                icon: 'send',
-                color: Colors.submitted,
-                bgColor: '#E3F2FD',
-                title: 'Submitted',
-                gradient: ['#E3F2FD', '#E1F5FE']
-            },
-            reminder: {
-                icon: 'bell',
-                color: Colors.reminder,
-                bgColor: '#F3E5F5',
-                title: 'Reminder',
-                gradient: ['#F3E5F5', '#F1F8E9']
-            },
-            cancelled: {
-                icon: 'slash',
-                color: Colors.cancelled,
-                bgColor: '#EFEBE9',
-                title: 'Cancelled',
-                gradient: ['#EFEBE9', '#F5F5F5']
-            },
-            default: {
-                icon: 'info',
-                color: Colors.info,
-                bgColor: '#F5F5F5',
-                title: 'Notification',
-                gradient: ['#F5F5F5', '#FAFAFA']
-            }
-        };
-        
-        return configs[type] || configs.default;
-    };
-
-    const getFilteredNotifications = () => {
-        switch (filter) {
-            case 'unread':
-                return notifications.filter(notification => !notification.read);
-            case 'read':
-                return notifications.filter(notification => notification.read);
-            default:
-                return notifications;
+                bgColor: '#fef2f2',
+                iconBg: '#fee2e2',
+            };
         }
     };
 
-    const filteredNotifications = getFilteredNotifications();
     const unreadCount = notifications.filter(n => !n.read).length;
+    const filteredNotifications = notifications.filter(notification => {
+        if (activeFilter === 'unread') return !notification.read;
+        if (activeFilter === 'read') return notification.read;
+        return true;
+    });
 
-    // 🎨 BEAUTIFUL NOTIFICATION ITEM COMPONENT
+    // 🎨 MODERN NOTIFICATION ITEM COMPONENT
     const NotificationItem = ({ notification, index }) => {
         const config = getNotificationConfig(notification.type);
         const scaleAnim = useState(new Animated.Value(0.9))[0];
+        const opacityAnim = useState(new Animated.Value(0))[0];
 
         useEffect(() => {
-            Animated.spring(scaleAnim, {
-                toValue: 1,
-                tension: 50,
-                friction: 7,
-                delay: index * 100,
-                useNativeDriver: true,
-            }).start();
+            Animated.parallel([
+                Animated.spring(scaleAnim, {
+                    toValue: 1,
+                    tension: 50,
+                    friction: 7,
+                    delay: index * 100,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacityAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    delay: index * 100,
+                    useNativeDriver: true,
+                })
+            ]).start();
         }, []);
+
+        const getSacramentIcon = (sacrament) => {
+            const icons = {
+                'Baptism': 'droplet',
+                'Confirmation': 'award',
+                'Marriage': 'heart',
+                'Funeral Service': 'cross',
+                'Mass Intention': 'book-open',
+                'Blessing': 'star',
+                'Holy Orders': 'user-check',
+                'First Communion': 'wine',
+                'Volunteer': 'users',
+                'Certificate': 'file-text',
+                'General': 'bell'
+            };
+            return icons[sacrament] || 'bell';
+        };
 
         return (
             <Animated.View 
@@ -258,82 +396,57 @@ export default function NotificationScreen({ navigation }) {
                     styles.notificationCard,
                     { 
                         transform: [{ scale: scaleAnim }],
-                        backgroundColor: config.bgColor,
-                        borderLeftColor: config.color
+                        opacity: opacityAnim,
                     }
                 ]}
             >
                 <TouchableOpacity 
                     style={styles.notificationContent}
                     onPress={() => markAsRead(notification.id)}
-                    activeOpacity={0.7}
+                    activeOpacity={0.8}
                 >
-                    {/* Header Section */}
-                    <View style={styles.notificationHeader}>
-                        <View style={styles.titleContainer}>
-                            <View style={[styles.iconContainer, { backgroundColor: config.color }]}>
-                                <Feather 
-                                    name={config.icon} 
-                                    size={16} 
-                                    color={Colors.textWhite} 
-                                />
-                            </View>
-                            <Text style={styles.notificationTitle}>
-                                {config.title}
+                    <View style={[styles.iconContainer, { backgroundColor: config.iconBg }]}>
+                        <Feather 
+                            name={getSacramentIcon(notification.sacrament)} 
+                            size={20} 
+                            color={config.color} 
+                        />
+                    </View>
+                    
+                    <View style={styles.contentContainer}>
+                        <View style={styles.messageHeader}>
+                            <Text style={styles.notificationMessage} numberOfLines={2}>
+                                {notification.message}
                             </Text>
                             {!notification.read && (
-                                <View style={styles.unreadBadge}>
-                                    <Text style={styles.unreadBadgeText}>New</Text>
-                                </View>
+                                <View style={styles.unreadDot} />
                             )}
                         </View>
-                        <View style={styles.headerActions}>
+                        
+                        <View style={styles.footer}>
+                            <View style={[styles.statusBadge, { backgroundColor: config.iconBg }]}>
+                                <Feather 
+                                    name={config.icon} 
+                                    size={12} 
+                                    color={config.color} 
+                                />
+                                <Text style={[styles.statusText, { color: config.color }]}>
+                                    {notification.type === 'approved' ? 'Approved' : 'Declined'}
+                                </Text>
+                            </View>
                             <Text style={styles.notificationTime}>
                                 {formatTimeAgo(notification.timestamp)}
                             </Text>
-                            <TouchableOpacity 
-                                style={styles.moreButton}
-                                onPress={() => deleteNotification(notification.id)}
-                            >
-                                <Feather name="more-vertical" size={16} color={Colors.textLight} />
-                            </TouchableOpacity>
                         </View>
                     </View>
 
-                    {/* Message Section */}
-                    <Text style={styles.notificationMessage}>
-                        {notification.message}
-                    </Text>
-
-                    {/* Additional Data Section */}
-                    {notification.data && (
-                        <View style={styles.dataContainer}>
-                            {notification.data.childName && (
-                                <View style={styles.dataRow}>
-                                    <Feather name="user" size={12} color={config.color} />
-                                    <Text style={styles.dataText}>
-                                        Child: {notification.data.childName}
-                                    </Text>
-                                </View>
-                            )}
-                            {notification.data.baptismDate && (
-                                <View style={styles.dataRow}>
-                                    <Feather name="calendar" size={12} color={config.color} />
-                                    <Text style={styles.dataText}>
-                                        Date: {formatDate(notification.data.baptismDate)}
-                                    </Text>
-                                </View>
-                            )}
-                            {notification.data.baptismTime && (
-                                <View style={styles.dataRow}>
-                                    <Feather name="clock" size={12} color={config.color} />
-                                    <Text style={styles.dataText}>
-                                        Time: {notification.data.baptismTime}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                    )}
+                    <TouchableOpacity 
+                        style={styles.moreButton}
+                        onPress={() => deleteNotification(notification.id)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Feather name="more-vertical" size={16} color={Colors.textLight} />
+                    </TouchableOpacity>
                 </TouchableOpacity>
             </Animated.View>
         );
@@ -355,17 +468,11 @@ export default function NotificationScreen({ navigation }) {
         });
     };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-        });
-    };
-
     return (
         <View style={styles.container}>
-            {/* 🎨 ENHANCED HEADER */}
+            <StatusBar backgroundColor={Colors.primary} barStyle="light-content" />
+            
+            {/* 🎨 MODERN HEADER */}
             <Animated.View 
                 style={[
                     styles.header,
@@ -373,20 +480,8 @@ export default function NotificationScreen({ navigation }) {
                 ]}
             >
                 <View style={styles.headerContent}>
-                    <TouchableOpacity 
-                        onPress={() => navigation?.goBack()} 
-                        style={styles.backButton}
-                        activeOpacity={0.7}
-                    >
-                        <Feather name="chevron-left" size={24} color={Colors.textWhite} />
-                    </TouchableOpacity>
-                    
-                    <View style={styles.headerTitleContainer}>
-                        <Text style={styles.headerTitle}>Notifications</Text>
-                        <Text style={styles.headerSubtitle}>
-                            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-                        </Text>
-                    </View>
+                  
+                   
 
                     <View style={styles.headerActions}>
                         {unreadCount > 0 && (
@@ -398,20 +493,11 @@ export default function NotificationScreen({ navigation }) {
                                 <Feather name="check-all" size={20} color={Colors.textWhite} />
                             </TouchableOpacity>
                         )}
-                        {notifications.length > 0 && (
-                            <TouchableOpacity 
-                                style={styles.headerActionButton}
-                                onPress={clearAllNotifications}
-                                activeOpacity={0.7}
-                            >
-                                <Feather name="trash-2" size={20} color={Colors.textWhite} />
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </View>
             </Animated.View>
 
-            {/* 🎨 ENHANCED FILTER TABS */}
+            {/* 🎨 FILTER TABS */}
             <View style={styles.filterContainer}>
                 <ScrollView 
                     horizontal 
@@ -427,24 +513,24 @@ export default function NotificationScreen({ navigation }) {
                             key={tab.key}
                             style={[
                                 styles.filterTab,
-                                filter === tab.key && styles.filterTabActive
+                                activeFilter === tab.key && styles.filterTabActive
                             ]}
-                            onPress={() => setFilter(tab.key)}
+                            onPress={() => setActiveFilter(tab.key)}
                             activeOpacity={0.7}
                         >
                             <Text style={[
                                 styles.filterTabText,
-                                filter === tab.key && styles.filterTabTextActive
+                                activeFilter === tab.key && styles.filterTabTextActive
                             ]}>
                                 {tab.label}
                             </Text>
                             <View style={[
                                 styles.countBadge,
-                                filter === tab.key && styles.countBadgeActive
+                                activeFilter === tab.key && styles.countBadgeActive
                             ]}>
                                 <Text style={[
                                     styles.countText,
-                                    filter === tab.key && styles.countTextActive
+                                    activeFilter === tab.key && styles.countTextActive
                                 ]}>
                                     {tab.count}
                                 </Text>
@@ -454,18 +540,20 @@ export default function NotificationScreen({ navigation }) {
                 </ScrollView>
             </View>
 
-            {/* 🎨 ENHANCED NOTIFICATIONS LIST */}
+            {/* 🎨 MODERN NOTIFICATIONS LIST */}
             <ScrollView
                 style={styles.notificationsList}
-                contentContainerStyle={styles.notificationsContent}
+                contentContainerStyle={[
+                    styles.notificationsContent,
+                    filteredNotifications.length === 0 && styles.emptyContainer
+                ]}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
                         colors={[Colors.primary]}
                         tintColor={Colors.primary}
-                        title="Pull to refresh"
-                        titleColor={Colors.textLight}
+                        progressBackgroundColor={Colors.background}
                     />
                 }
                 showsVerticalScrollIndicator={false}
@@ -473,28 +561,25 @@ export default function NotificationScreen({ navigation }) {
                 {filteredNotifications.length === 0 ? (
                     <View style={styles.emptyState}>
                         <View style={styles.emptyStateIcon}>
-                            <Feather name="bell-off" size={80} color={Colors.textLight} />
+                            <Feather name="bell" size={64} color={Colors.textLight} />
                         </View>
                         <Text style={styles.emptyStateTitle}>
-                            {filter === 'all' ? 'No Notifications' : 
-                             filter === 'unread' ? 'No Unread Notifications' : 
-                             'No Read Notifications'}
+                            No notifications
                         </Text>
                         <Text style={styles.emptyStateMessage}>
-                            {filter === 'all' 
-                                ? "You're all caught up! New notifications will appear here."
-                                : "No notifications match your current filter."
+                            {activeFilter === 'all' 
+                                ? "You're all caught up! New updates will appear here."
+                                : `No ${activeFilter} notifications found.`
                             }
                         </Text>
-                        {filter !== 'all' && (
-                            <TouchableOpacity 
-                                style={styles.changeFilterButton}
-                                onPress={() => setFilter('all')}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.changeFilterText}>Show All Notifications</Text>
-                            </TouchableOpacity>
-                        )}
+                        <TouchableOpacity 
+                            style={styles.refreshButton}
+                            onPress={onRefresh}
+                            activeOpacity={0.7}
+                        >
+                            <Feather name="refresh-cw" size={16} color={Colors.textWhite} />
+                            <Text style={styles.refreshButtonText}>Refresh</Text>
+                        </TouchableOpacity>
                     </View>
                 ) : (
                     filteredNotifications.map((notification, index) => (
@@ -506,83 +591,32 @@ export default function NotificationScreen({ navigation }) {
                     ))
                 )}
                 
-                {/* Bottom Spacer */}
                 <View style={styles.bottomSpacer} />
             </ScrollView>
         </View>
     );
 }
 
-// 🎨 BEAUTIFUL STYLES
+// 🎨 MODERN STYLES
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
     },
-    
-    // HEADER STYLES
-    header: {
-        backgroundColor: Colors.primary,
-        paddingTop: Platform.OS === 'android' ? 30 : 50,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 20,
-        borderBottomRightRadius: 20,
-        shadowColor: Colors.primaryDark,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-    },
-    backButton: {
-        padding: 8,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
-    headerTitleContainer: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: Colors.textWhite,
-        letterSpacing: -0.5,
-    },
-    headerSubtitle: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
-        marginTop: 2,
-    },
-    headerActions: {
-        flexDirection: 'row',
-    },
-    headerActionButton: {
-        padding: 8,
-        marginLeft: 8,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-    },
+
+
+   
+  
     
     // FILTER STYLES
     filterContainer: {
         backgroundColor: Colors.cardBackground,
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 3,
     },
     filterScrollContent: {
-        paddingHorizontal: 15,
-        paddingVertical: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
     },
     filterTab: {
         flexDirection: 'row',
@@ -590,7 +624,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 20,
-        marginRight: 8,
+        marginRight: 12,
         backgroundColor: Colors.background,
         borderWidth: 1,
         borderColor: Colors.border,
@@ -633,94 +667,87 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     notificationsContent: {
-        padding: 16,
+        padding: 20,
+    },
+    emptyContainer: {
+        flexGrow: 1,
+        justifyContent: 'center',
     },
     notificationCard: {
+        backgroundColor: Colors.cardBackground,
         borderRadius: 16,
         marginBottom: 12,
-        borderLeftWidth: 4,
         shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
+        shadowRadius: 12,
         elevation: 3,
-        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: Colors.border,
     },
     notificationContent: {
         padding: 16,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
     },
-    notificationHeader: {
+    iconContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    contentContainer: {
+        flex: 1,
+    },
+    messageHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         marginBottom: 8,
     },
-    titleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-    },
-    iconContainer: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    notificationTitle: {
+    notificationMessage: {
         fontSize: 16,
-        fontWeight: '700',
         color: Colors.textPrimary,
+        lineHeight: 22,
+        fontWeight: '500',
         flex: 1,
+        marginRight: 8,
     },
-    unreadBadge: {
+    unreadDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: Colors.primary,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 8,
-        marginLeft: 8,
+        marginTop: 6,
     },
-    unreadBadgeText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: Colors.textWhite,
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
-    headerActions: {
+    statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        gap: 4,
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: '600',
     },
     notificationTime: {
         fontSize: 12,
         color: Colors.textLight,
         fontWeight: '500',
-        marginRight: 8,
     },
     moreButton: {
         padding: 4,
-    },
-    notificationMessage: {
-        fontSize: 14,
-        color: Colors.textSecondary,
-        lineHeight: 20,
-        marginBottom: 8,
-    },
-    dataContainer: {
-        backgroundColor: 'rgba(255,255,255,0.7)',
-        borderRadius: 8,
-        padding: 12,
-        marginTop: 8,
-    },
-    dataRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    dataText: {
-        fontSize: 12,
-        color: Colors.textSecondary,
         marginLeft: 8,
-        fontWeight: '500',
+        marginTop: -4,
     },
     
     // EMPTY STATE STYLES
@@ -731,11 +758,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 40,
     },
     emptyStateIcon: {
-        marginBottom: 20,
-        opacity: 0.5,
+        marginBottom: 24,
+        opacity: 0.6,
     },
     emptyStateTitle: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '700',
         color: Colors.textPrimary,
         marginBottom: 12,
@@ -746,22 +773,30 @@ const styles = StyleSheet.create({
         color: Colors.textLight,
         textAlign: 'center',
         lineHeight: 22,
-        marginBottom: 20,
+        marginBottom: 32,
     },
-    changeFilterButton: {
+    refreshButton: {
+        flexDirection: 'row',
         backgroundColor: Colors.primary,
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 12,
+        alignItems: 'center',
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 3,
     },
-    changeFilterText: {
-        fontSize: 14,
+    refreshButtonText: {
+        fontSize: 16,
         fontWeight: '600',
         color: Colors.textWhite,
+        marginLeft: 8,
     },
     
     // MISC STYLES
     bottomSpacer: {
-        height: 30,
+        height: 20,
     },
 });

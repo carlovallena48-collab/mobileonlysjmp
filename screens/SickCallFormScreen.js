@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   Image, Platform, Alert, Dimensions, ActivityIndicator, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
-import SignatureCanvas from 'react-native-signature-canvas';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -108,20 +108,80 @@ const VisitDateTimeSelectionOverlay = ({ currentSelectedDate, currentSelectedTim
 };
 
 // Main SickCallFormScreen Component (ms)
-export default function SickCallFormScreen({ navigation }) {
-  const signatureRef = useRef(null);
+export default function SickCallFormScreen({ navigation, route }) {
   const [form, setForm] = useState({
-    patientName: '', address: '', contactNumber: '', contactPerson: '',
-    relationship: '', status: '', age: '', dateOfVisit: null,
-    timeOfVisit: null, sickness: '', signature: null,
+    fullName: '', email: '', contactNumber: '',
+    dateOfVisit: null, timeOfVisit: null, sickness: ''
   });
   const [showVisitSelectionOverlay, setShowVisitSelectionOverlay] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+
+  // CRITICAL FIX: Improved user data loading
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        console.log('🔍 Loading user data for SickCall form...');
+        
+        // Try multiple storage keys to find user data
+        const storageKeys = ['user', 'userData', '@userData', 'currentUser'];
+        let userData = null;
+
+        for (const key of storageKeys) {
+          const data = await AsyncStorage.getItem(key);
+          if (data) {
+            console.log(`✅ Found user data in key: ${key}`);
+            userData = data;
+            break;
+          }
+        }
+
+        if (userData) {
+          const user = JSON.parse(userData);
+          console.log('👤 User data loaded:', {
+            email: user.email,
+            fullName: user.fullName,
+            contact: user.contact
+          });
+          
+          setUserEmail(user.email);
+          
+          // Pre-fill form with user data
+          setForm(prev => ({
+            ...prev,
+            fullName: user.fullName || '',
+            email: user.email || '',
+            contactNumber: user.contact || user.contactNumber || ''
+          }));
+        } else {
+          console.log('❌ No user data found in any storage key');
+          // If no user data, show alert and redirect to login
+          Alert.alert(
+            'Login Required',
+            'Please login to submit a Sick Call request.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('Login')
+              }
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('❌ Error loading user data:', error);
+        Alert.alert('Error', 'Failed to load user information. Please login again.');
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+
+    getUserData();
+  }, [navigation]);
 
   const handleChange = useCallback((field, value) => {
-    if (field.includes('Name') || field.includes('Address') || field.includes('Person') || field.includes('Relationship')) {
+    if (field === 'fullName') {
       value = value.replace(/\b\w/g, char => char.toUpperCase());
     }
     setForm(prev => ({ ...prev, [field]: value }));
@@ -131,39 +191,128 @@ export default function SickCallFormScreen({ navigation }) {
   const fmtTime = useCallback(t => t ? t : 'Select Time', []);
 
   const handleDateTimeConfirmed = useCallback((date, time) => {
-    handleChange('dateOfVisit', date); handleChange('timeOfVisit', time); setShowVisitSelectionOverlay(false);
+    handleChange('dateOfVisit', date); 
+    handleChange('timeOfVisit', time); 
+    setShowVisitSelectionOverlay(false);
   }, [handleChange]);
 
-  const handleSignatureSave = () => { if (signatureRef.current) signatureRef.current.readSignature(); };
-  const handleSignatureOK = signature => { setForm(prev => ({ ...prev, signature })); setShowSignatureModal(false); };
-  const handleClearSignature = () => { if (signatureRef.current) signatureRef.current.clearSignature(); setForm(prev => ({ ...prev, signature: null })); };
-
   const handleSubmit = () => {
-    const requiredFields = { patientName: 'Patient Name', address: 'Address', contactNumber: 'Contact Number',
-      dateOfVisit: 'Date of Visit', timeOfVisit: 'Time of Visit', sickness: 'Sickness/Condition' };
+    // Check if user is loaded
+    if (!userEmail) {
+      Alert.alert(
+        'Login Required',
+        'Please login to submit a Sick Call request.',
+        [
+          {
+            text: 'Login',
+            onPress: () => navigation.navigate('Login')
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+      return;
+    }
+
+    const requiredFields = { 
+      fullName: 'Full Name', 
+      email: 'Email Address', 
+      contactNumber: 'Contact Number',
+      dateOfVisit: 'Date of Visit', 
+      timeOfVisit: 'Time of Visit', 
+      sickness: 'Sickness/Condition' 
+    };
+    
     for (const field in requiredFields) {
       if (!form[field] || (typeof form[field] === 'string' && !form[field].trim())) {
-        Alert.alert('Missing Info', `Please fill in the '${requiredFields[field]}' field.`); return;
+        Alert.alert('Missing Info', `Please fill in the '${requiredFields[field]}' field.`); 
+        return;
       }
     }
-    if (!form.signature) { Alert.alert('Missing Signature', 'Please provide a signature in the remarks section.'); return; }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    // Contact number validation (basic)
+    if (form.contactNumber.length < 10) {
+      Alert.alert('Invalid Contact Number', 'Please enter a valid contact number.');
+      return;
+    }
+    
     setShowModal(true);
   };
 
   const confirmSubmit = async () => {
     setIsSubmitting(true);
-    const formDataForApi = { ...form, dateOfVisit: form.dateOfVisit ? form.dateOfVisit.toLocaleDateString('en-US') : '' };
+    
+    // CRITICAL FIX: Ensure we have user email
+    if (!userEmail) {
+      Alert.alert('Error', 'User not authenticated. Please login again.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const formDataForApi = { 
+      ...form, 
+      dateOfVisit: form.dateOfVisit ? form.dateOfVisit.toLocaleDateString('en-US') : '',
+      submittedByEmail: userEmail // CRITICAL: Use logged-in user's email
+    };
+    
+    console.log('📤 Submitting SickCall request:', {
+      formData: formDataForApi,
+      loggedInUser: userEmail,
+      hasSubmittedByEmail: !!userEmail
+    });
+    
     try {
-      await new Promise(r => setTimeout(r, 1500));
-      setShowModal(false);
-      Alert.alert('Success!', 'Your Sick Call request has been submitted!', [{ text: 'OK', onPress: () => {
-        setForm({ patientName: '', address: '', contactNumber: '', contactPerson: '', relationship: '',
-          status: '', age: '', dateOfVisit: null, timeOfVisit: null, sickness: '', signature: null, });
-        if (signatureRef.current) signatureRef.current.clearSignature();
-        setShowVisitSelectionOverlay(true); navigation.goBack();
-      }}]);
-    } catch (e) { console.error("Error submitting:", e); Alert.alert('Failed', 'An error occurred. Try again.'); }
-    finally { setIsSubmitting(false); }
+      const SERVER_URL = 'http://192.168.100.199:5000';
+      
+      console.log('🚀 Sending request to:', `${SERVER_URL}/api/sickcall_requests`);
+      
+      const response = await fetch(`${SERVER_URL}/api/sickcall_requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formDataForApi),
+      });
+
+      const result = await response.json();
+      console.log('📨 Server response:', result);
+
+      if (response.ok) {
+        setShowModal(false);
+        Alert.alert('Success!', result.message || 'Your Sick Call request has been submitted!', [{ 
+          text: 'OK', 
+          onPress: () => {
+            setForm({ 
+              fullName: '', 
+              email: '', 
+              contactNumber: '', 
+              dateOfVisit: null, 
+              timeOfVisit: null, 
+              sickness: ''
+            });
+            setShowVisitSelectionOverlay(true); 
+            navigation.goBack();
+          }
+        }]);
+      } else {
+        throw new Error(result.message || 'Failed to submit request');
+      }
+    } catch (error) { 
+      console.error("❌ Error submitting:", error); 
+      Alert.alert('Failed', error.message || 'An error occurred. Try again.'); 
+    }
+    finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   const renderSection = (title, iconName, children) => (
@@ -180,19 +329,22 @@ export default function SickCallFormScreen({ navigation }) {
     <View style={ms.inputGroup}>
       <Text style={[ms.label, { color: C.darkText }]}>{label} {isRequired && <Text style={ms.requiredIndicator}>*</Text>}</Text>
       <View style={ms.inputContainer}>
-        {/* Render icon if provided, it will sit as the first item in the flex row */}
         {icon && <Feather name={icon} size={20} color={C.grayText} style={ms.inputIcon} />}
         <TextInput
           style={[
             ms.inputField,
             { color: C.darkText },
             multiline && ms.textArea,
-            // Dynamically set paddingLeft based on icon presence
-            { paddingLeft: icon ? (20 + 12) : 15 } // 20 (icon width) + 12 (icon marginRight) or 15 (default container padding)
+            { paddingLeft: icon ? (20 + 12) : 15 }
           ]}
-          placeholder={placeholder} placeholderTextColor={C.grayText} value={value}
-          onChangeText={onChangeText} keyboardType={keyboardType} autoCapitalize={autoCapitalize}
-          multiline={multiline} numberOfLines={multiline ? 4 : 1}
+          placeholder={placeholder} 
+          placeholderTextColor={C.grayText} 
+          value={value}
+          onChangeText={onChangeText} 
+          keyboardType={keyboardType} 
+          autoCapitalize={autoCapitalize}
+          multiline={multiline} 
+          numberOfLines={multiline ? 4 : 1}
         />
       </View>
     </View>
@@ -214,10 +366,40 @@ export default function SickCallFormScreen({ navigation }) {
   const DetailRow = ({ label, value }) => (
     <View style={ms.modalDetailRow}>
       <Text style={[ms.modalDetailLabel, { color: C.darkText }]}>{label}:</Text>
-      {label === 'Signature' && value ? (<Image source={{ uri: value }} style={ms.modalSignatureImage} resizeMode="contain" />) :
-      (<Text style={[ms.modalDetailValue, { color: C.grayText }]}>{value || 'N/A'}</Text>)}
+      <Text style={[ms.modalDetailValue, { color: C.grayText }]}>{value || 'N/A'}</Text>
     </View>
   );
+
+  // Show loading while checking user authentication
+  if (isLoadingUser) {
+    return (
+      <View style={[ms.container, { backgroundColor: C.lightBg, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={C.primary} />
+        <Text style={{ marginTop: 16, color: C.darkText }}>Loading user information...</Text>
+      </View>
+    );
+  }
+
+  // Show message if no user is logged in
+  if (!userEmail) {
+    return (
+      <View style={[ms.container, { backgroundColor: C.lightBg, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <Feather name="user-x" size={64} color={C.redError} />
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: C.darkText, marginTop: 16, textAlign: 'center' }}>
+          Login Required
+        </Text>
+        <Text style={{ fontSize: 16, color: C.grayText, marginTop: 8, textAlign: 'center' }}>
+          Please login to submit a Sick Call request.
+        </Text>
+        <TouchableOpacity 
+          style={[ms.submitButton, { marginTop: 20 }]}
+          onPress={() => navigation.navigate('Login')}
+        >
+          <Text style={ms.submitButtonText}>Go to Login</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={[ms.container, { backgroundColor: C.lightBg }]}>
@@ -238,64 +420,53 @@ export default function SickCallFormScreen({ navigation }) {
         <Text style={[ms.headerMemorandumTitle, { color: C.headerText }]}>SICK CALL FORM</Text>
       </View>
 
+      {/* User Info Banner */}
+      <View style={ms.userInfoBanner}>
+        <Feather name="user-check" size={16} color={C.primary} />
+        <Text style={ms.userInfoText}>Logged in as: {userEmail}</Text>
+      </View>
+
       {showVisitSelectionOverlay ? (
-        <VisitDateTimeSelectionOverlay currentSelectedDate={form.dateOfVisit} currentSelectedTime={form.timeOfVisit} onConfirmSelection={handleDateTimeConfirmed} />
+        <VisitDateTimeSelectionOverlay 
+          currentSelectedDate={form.dateOfVisit} 
+          currentSelectedTime={form.timeOfVisit} 
+          onConfirmSelection={handleDateTimeConfirmed} 
+        />
       ) : (
         <ScrollView contentContainerStyle={ms.scrollViewContent}>
           {renderSection('Visit Details', 'calendar', <>
             {renderDateTimeDisplay('Date of Visit', form.dateOfVisit, 'calendar', () => setShowVisitSelectionOverlay(true))}
             {renderDateTimeDisplay('Time of Visit', form.timeOfVisit, 'clock', () => setShowVisitSelectionOverlay(true))}
             {renderInput('SICKNESS/CONDITION', 'Describe the sickness, condition, or reason for sick call', form.sickness, v => handleChange('sickness', v), 'default', null, 'sentences', true, true)}
-            <View style={ms.inputGroup}>
-                <Text style={[ms.label, { color: C.darkText }]}>Remarks / Signature: <Text style={ms.requiredIndicator}>*</Text></Text>
-                <TouchableOpacity onPress={() => setShowSignatureModal(true)} style={ms.openSignatureButton} activeOpacity={0.7}>
-                    <Feather name="edit-3" size={20} color={C.primary} style={ms.inputIcon} />
-                    <Text style={[ms.openSignatureButtonText, { color: C.darkText }]}>
-                        {form.signature ? 'Signature Provided (Tap to Redraw)' : 'Tap to Sign Here'}
-                    </Text>
-                </TouchableOpacity>
-                {form.signature && (
-                    <View style={ms.signaturePreviewContainer}>
-                        <Text style={[ms.label, {color: C.darkText, marginBottom: 5}]}>Current Signature:</Text>
-                        <Image source={{ uri: form.signature }} style={ms.signaturePreviewImage} resizeMode="contain" />
-                        <TouchableOpacity onPress={handleClearSignature} style={ms.clearSignatureButton} activeOpacity={0.7}>
-                            <Feather name="x-circle" size={18} color={C.redError} />
-                            <Text style={[ms.clearSignatureText, { color: C.redError }]}>Clear Current Signature</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </View>
           </>)}
-          {renderSection('Patient Information', 'user', <>
-            {renderInput('NAME', 'Full Name of Patient', form.patientName, v => handleChange('patientName', v), 'default', 'user', 'words', false, true)}
-            {renderInput('AGE', 'Age of Patient', form.age, v => handleChange('age', v), 'numeric', 'info', 'none')}
-            {renderInput('ADDRESS', 'Complete Address', form.address, v => handleChange('address', v), 'default', 'home', 'words', false, true)}
-            {renderInput('STATUS', 'e.g., Stable, Critical, Recovering', form.status, v => handleChange('status', v), 'default', 'activity')}
-          </>)}
-          {renderSection('Contact Person Information', 'phone', <>
+          
+          {renderSection('Personal Information', 'user', <>
+            {renderInput('FULL NAME', 'Enter your full name', form.fullName, v => handleChange('fullName', v), 'default', 'user', 'words', false, true)}
+            {renderInput('EMAIL ADDRESS', 'Enter your email address', form.email, v => handleChange('email', v), 'email-address', 'mail', 'none', false, true)}
             {renderInput('CONTACT NUMBER', 'e.g., 09XX-XXX-XXXX', form.contactNumber, v => handleChange('contactNumber', v), 'phone-pad', 'phone', 'none', false, true)}
-            {renderInput('CONTACT PERSON', 'Name of Contact Person', form.contactPerson, v => handleChange('contactPerson', v), 'default', 'user-plus')}
-            {renderInput('RELATIONSHIP', 'e.g., Son, Daughter, Spouse', form.relationship, v => handleChange('relationship', v), 'default', 'heart')}
           </>)}
+          
           <TouchableOpacity onPress={handleSubmit} disabled={isSubmitting} activeOpacity={0.7}
             style={ms.submitButton}>
             {isSubmitting ? (<ActivityIndicator color={C.white} />) : (<Text style={ms.submitButtonText}>Review Details</Text>)}
           </TouchableOpacity>
         </ScrollView>
       )}
+      
       <Modal transparent visible={showModal} animationType="fade">
         <View style={ms.modalOverlay}>
           <View style={ms.modalContent}>
             <Text style={[ms.modalTitle, { color: C.darkText }]}>Confirm Request Details</Text>
             <ScrollView style={ms.modalScrollContent}>
-              <DetailRow label="Sacrament" value="Sick Call" /><DetailRow label="Parish" value="San Jose Manggagawa Parish" />
-              <DetailRow label="Patient Name" value={form.patientName} /><DetailRow label="Age" value={form.age} />
-              <DetailRow label="Address" value={form.address} /><DetailRow label="Status" value={form.status} />
-              <DetailRow label="Contact Number" value={form.contactNumber} /><DetailRow label="Contact Person" value={form.contactPerson} />
-              <DetailRow label="Relationship" value={form.relationship} />
-              <DetailRow label="Date of Visit" value={fmtDate(form.dateOfVisit)} /><DetailRow label="Time of Visit" value={fmtTime(form.timeOfVisit)} />
+              <DetailRow label="Sacrament" value="Sick Call" />
+              <DetailRow label="Parish" value="San Jose Manggagawa Parish" />
+              <DetailRow label="Full Name" value={form.fullName} />
+              <DetailRow label="Email" value={form.email} />
+              <DetailRow label="Contact Number" value={form.contactNumber} />
+              <DetailRow label="Date of Visit" value={fmtDate(form.dateOfVisit)} />
+              <DetailRow label="Time of Visit" value={fmtTime(form.timeOfVisit)} />
               <DetailRow label="Sickness/Condition" value={form.sickness} />
-              <DetailRow label="Signature" value={form.signature} />
+              <DetailRow label="Submitted By" value={userEmail} />
             </ScrollView>
             <View style={ms.modalActions}>
               <TouchableOpacity onPress={() => setShowModal(false)} disabled={isSubmitting} activeOpacity={0.7}
@@ -310,39 +481,11 @@ export default function SickCallFormScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-      <Modal transparent visible={showSignatureModal} animationType="slide" onRequestClose={() => setShowSignatureModal(false)}>
-        <View style={ms.signatureModalOverlay}>
-          <View style={ms.signatureModalContent}>
-            <Text style={[ms.signatureModalTitle, { color: C.darkText }]}>Draw Your Signature</Text>
-            <View style={ms.signaturePadContainer}>
-              <SignatureCanvas ref={signatureRef} onOK={handleSignatureOK}
-                webStyle={`
-                    .m-signature-pad--footer {display: none;}
-                    .m-signature-pad {box-shadow: none; border: none;}
-                    body {background-color: #f0f0f0;}
-                `}
-                canvasText="Sign here" backgroundColor="#f0f0f0" penColor={C.black}
-                minWidth={1} maxWidth={3} velocityFilterWeight={0.9}
-              />
-            </View>
-            <View style={ms.signatureModalActions}>
-              <TouchableOpacity onPress={handleClearSignature} style={[ms.modalButton, ms.signatureModalClearButton]} activeOpacity={0.7}>
-                <Feather name="x-circle" size={20} color={C.redError} />
-                <Text style={[ms.modalButtonText, { color: C.redError }]}>Clear</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSignatureSave} style={[ms.modalButton, { backgroundColor: C.primary }]} activeOpacity={0.7}>
-                <Feather name="check-circle" size={20} color={C.white} />
-                <Text style={[ms.modalButtonText, { color: C.white }]}>Save Signature</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
-// Renamed styles for brevity (ovS = overlayStyles, ms = mainFormStyles)
+// Styles remain the same as in your original code...
 const ovS = StyleSheet.create({
   container: { flex: 1, marginVertical: 20, backgroundColor: C.white, borderRadius: 15, padding: 25,
     marginHorizontal: 20, shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 },
@@ -396,6 +539,23 @@ const ms = StyleSheet.create({
   headerMemorandumTitle: { fontSize: 20, fontWeight: 'bold', marginTop: 15, borderBottomWidth: 2,
     borderBottomColor: C.primary, paddingBottom: 5,
   },
+  userInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    padding: 12,
+    marginHorizontal: 20,
+    marginTop: 10,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: C.primary,
+  },
+  userInfoText: {
+    marginLeft: 8,
+    color: C.darkText,
+    fontWeight: '600',
+    fontSize: 14,
+  },
   scrollViewContent: { padding: 20, paddingBottom: 100 },
   sectionCard: { borderRadius: 12, padding: 20, marginBottom: 20, backgroundColor: C.white,
     shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1,
@@ -411,28 +571,26 @@ const ms = StyleSheet.create({
   requiredIndicator: { color: C.redError, fontSize: 14 },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start', // Important for multiline text to start at top
+    alignItems: 'flex-start',
     backgroundColor: C.inputBg,
     borderColor: C.inputBorder,
     borderWidth: 1,
     borderRadius: 10,
-    paddingVertical: 10, // Add internal vertical padding here
+    paddingVertical: 10,
   },
   inputIcon: {
-    marginRight: 12, // Space between icon and text input
-    marginLeft: 15, // Aligns icon with the 15 units padding of the container
+    marginRight: 12,
+    marginLeft: 15,
   },
   inputField: {
     flex: 1,
-    // height: '100%', // Removed as it conflicts with multiline
     fontSize: 16,
-    paddingVertical: 0, // Control vertical padding via inputContainer
-    paddingHorizontal: 0, // Ensure no extra horizontal padding here
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
   textArea: {
     minHeight: 100,
-    textAlignVertical: 'top', // For Android
-    // paddingTop and paddingBottom are now handled by inputContainer's paddingVertical
+    textAlignVertical: 'top',
   },
 
   dateTimeDisplayWrapper: { marginBottom: 15 },
@@ -442,23 +600,6 @@ const ms = StyleSheet.create({
     backgroundColor: C.inputBg, borderColor: C.inputBorder,
   },
   dateTimeDisplayText: { flex: 1, fontSize: 16, marginLeft: 5, color: C.grayText },
-
-  openSignatureButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.inputBg,
-    borderColor: C.inputBorder, borderWidth: 1, borderRadius: 10, height: 55,
-    paddingHorizontal: 15, justifyContent: 'flex-start',
-  },
-  openSignatureButtonText: { fontSize: 16, marginLeft: 5, flex: 1 },
-  signaturePreviewContainer: { marginTop: 15, alignItems: 'center', borderWidth: 1,
-    borderColor: C.inputBorder, borderRadius: 10, padding: 10, backgroundColor: C.inputBg,
-  },
-  signaturePreviewImage: { width: '90%', height: 100, resizeMode: 'contain', borderWidth: 1,
-    borderColor: C.inputBorder, backgroundColor: C.white, borderRadius: 5, marginBottom: 10,
-  },
-  clearSignatureButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 8, borderRadius: 8, backgroundColor: C.lightBg,
-    borderColor: C.redError, borderWidth: 1, width: '80%',
-  },
-  clearSignatureText: { marginLeft: 5, fontSize: 14, fontWeight: 'bold' },
 
   submitButton: { padding: 18, alignItems: 'center', borderRadius: 12, backgroundColor: C.primary,
     shadowColor: C.shadow, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2,
@@ -478,9 +619,6 @@ const ms = StyleSheet.create({
   },
   modalDetailLabel: { fontSize: 15, fontWeight: '600', flex: 1 },
   modalDetailValue: { fontSize: 15, flex: 2, textAlign: 'right' },
-  modalSignatureImage: { width: '60%', height: 70, borderWidth: 1, borderColor: C.inputBorder,
-    backgroundColor: '#f9f9f9', borderRadius: 5,
-  },
   modalActions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 30 },
   modalButton: { paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', minWidth: 120,
@@ -489,16 +627,4 @@ const ms = StyleSheet.create({
     flexDirection: 'row',
   },
   modalButtonText: { fontSize: 17, fontWeight: 'bold', marginLeft: 5 },
-
-  signatureModalOverlay: { flex: 1, backgroundColor: C.modalBg, justifyContent: 'center', alignItems: 'center' },
-  signatureModalContent: { backgroundColor: C.white, borderRadius: 15, padding: 20, width: '90%',
-    height: '70%', shadowColor: C.shadow, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25, shadowRadius: 10, elevation: 10, justifyContent: 'space-between',
-  },
-  signatureModalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  signaturePadContainer: { flex: 1, borderColor: C.inputBorder, borderWidth: 1, borderRadius: 10,
-    overflow: 'hidden', backgroundColor: '#f0f0f0', marginBottom: 20,
-  },
-  signatureModalActions: { flexDirection: 'row', justifyContent: 'space-around', width: '100%' },
-  signatureModalClearButton: { backgroundColor: C.cancelBtn, borderColor: C.redError, borderWidth: 1 },
 });

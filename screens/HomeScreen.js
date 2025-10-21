@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // --- MOCK BIBLE VERSE DATA ---
 const bibleVerses = [
@@ -53,44 +54,44 @@ import church6 from '../assets/parish.jpg';
 
 // Updated Image Data with better captions and consistent naming
 const parishImages = [
-    { id: 'p1', image: church6, caption: 'Main Church', title: 'San Jose Manggagawa Parish' },
-    { id: 'p2', image: annointing, caption: 'Sacraments', title: 'San Jose Manggagawa Parish' },
-    { id: 'p3', image: baptism, caption: 'Baptismal Area', title: 'San Jose Manggagawa Parish' },
-    { id: 'p4', image: confession, caption: 'Confession Room', title: 'San Jose Manggagawa Parish' },
-    { id: 'p5', image: confirmation, caption: 'Confirmation', title: 'San Jose Manggagawa Parish' },
-    { id: 'p6', image: eucharist, caption: 'Holy Mass', title: 'San Jose Manggagawa Parish' },
+    { id: 'p1', image: church6, caption: 'San Jose Manggagawa Parish', title: '' },
+    { id: 'p2', image: annointing, caption: 'San Jose Manggagawa Parish', title: '' },
+    { id: 'p3', image: baptism, caption: 'San Jose Manggagawa Parish', title: '' },
+    { id: 'p4', image: confession, caption: 'San Jose Manggagawa Parish', title: '' },
+    { id: 'p5', image: confirmation, caption: 'San Jose Manggagawa Parish', title: '' },
+    { id: 'p6', image: eucharist, caption: 'San Jose Manggagawa Parish', title: '' },
 ];
 
 const { width, height } = Dimensions.get('window');
 const CAROUSEL_ITEM_WIDTH = width - 40;
 const AUTOSWIPE_INTERVAL = 5000;
 
-// --- SUPER GALACTIC COLOR PALETTE ---
+// 🎨 GREEN THEME COLOR PALETTE
 const Colors = {
-    primary: '#25a165ff',           // Rich Royal Blue
-    primaryLight: '#3b82f6',      // Bright Blue
-    primaryDark: '#1e40af',       // Dark Blue
-    secondary: '#d97706',         // Warm Amber
-    secondaryLight: '#f59e0b',    // Golden Yellow
-    secondaryDark: '#b45309',     // Dark Amber
-    background: '#f8fafc',        // Clean White/Light Gray
-    cardBackground: '#ffffff',    // Pure White
-    textPrimary: '#1e293b',       // Deep Navy
-    textSecondary: '#64748b',     // Slate Gray
-    textLight: '#94a3b8',         // Light Slate
-    accentGreen: '#059669',       // Emerald Green
-    accentBlue: '#2563eb',        // Cobalt Blue
-    accentPurple: '#7c3aed',      // Purple
-    lightGreen: '#dcfce7',        // Mint Green
-    lightGold: '#fef3c7',         // Light Amber
-    lightBlue: '#dbeafe',         // Light Blue
-    lightPurple: '#ede9fe',       // Light Purple
-    facebook: '#1877F2',
-    instagram: '#E4405F',
-    youtube: '#FF0000',
-    border: '#e2e8f0',            // Subtle Border
-    error: '#ef4444',             // Red for errors/badges
-    success: '#10b981',           // Green for success
+    primary: "#1a5e1a",           // Deep Forest Green
+    primaryLight: "#2e7d32",      // Medium Green
+    primaryDark: "#0d3d0d",       // Dark Green
+    secondary: "#ffd700",         // Gold
+    secondaryLight: "#ffeb3b",    // Light Gold
+    secondaryDark: "#b8860b",     // Dark Gold
+    background: "#f8fafc",        // Clean White/Light Gray
+    cardBackground: "#ffffff",    // Pure White
+    textPrimary: "#1e293b",       // Deep Navy
+    textSecondary: "#64748b",     // Slate Gray
+    textLight: "#94a3b8",         // Light Slate
+    accentGreen: "#059669",       // Emerald Green
+    accentBlue: "#2563eb",        // Cobalt Blue
+    accentPurple: "#7c3aed",      // Purple
+    lightGreen: "#dcfce7",        // Mint Green
+    lightGold: "#fef3c7",         // Light Amber
+    lightBlue: "#dbeafe",         // Light Blue
+    lightPurple: "#ede9fe",       // Light Purple
+    facebook: "#1877F2",
+    instagram: "#E4405F",
+    youtube: "#FF0000",
+    border: "#e2e8f0",            // Subtle Border
+    error: "#ef4444",             // Red for errors/badges
+    success: "#10b981",           // Green for success
 };
 
 // --- UPDATED MASS SCHEDULES BASED ON IMAGE ---
@@ -211,20 +212,26 @@ const BibleVerseModal = ({ isVisible, onClose }) => {
         >
             <View style={modalStyles.centeredView}>
                 <View style={modalStyles.modalView}>
-                    <View style={modalStyles.modalHeader}>
+                    <LinearGradient
+                        colors={[Colors.primary, Colors.primaryLight]}
+                        style={modalStyles.modalHeader}
+                    >
                         <View style={modalStyles.titleContainer}>
-                            <Ionicons name="book" size={24} color={Colors.primary} />
+                            <Ionicons name="book" size={24} color="#fff" />
                             <Text style={modalStyles.modalTitle}>Daily Scripture</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
-                            <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                            <Ionicons name="close" size={24} color="#fff" />
                         </TouchableOpacity>
-                    </View>
+                    </LinearGradient>
                     
                     <View style={modalStyles.verseContainer}>
-                        <View style={modalStyles.verseIconContainer}>
-                            <Ionicons name="quote" size={32} color={Colors.secondary} />
-                        </View>
+                        <LinearGradient
+                            colors={[Colors.lightGreen, '#f0fdf4']}
+                            style={modalStyles.verseIconContainer}
+                        >
+                            <Ionicons name="quote" size={32} color={Colors.primary} />
+                        </LinearGradient>
                         <Text style={modalStyles.verseText}>"{dailyVerse.verse}"</Text>
                         <View style={modalStyles.referenceContainer}>
                             <View style={modalStyles.referenceLine} />
@@ -234,7 +241,12 @@ const BibleVerseModal = ({ isVisible, onClose }) => {
                     </View>
                     
                     <TouchableOpacity style={modalStyles.actionButton} onPress={onClose}>
-                        <Text style={modalStyles.actionButtonText}>Amen</Text>
+                        <LinearGradient
+                            colors={[Colors.primary, Colors.primaryLight]}
+                            style={modalStyles.gradientButton}
+                        >
+                            <Text style={modalStyles.actionButtonText}>Amen</Text>
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -252,21 +264,27 @@ const SaintJosephModal = ({ isVisible, onClose }) => (
     >
         <View style={modalStyles.centeredView}>
             <View style={[modalStyles.modalView, { maxHeight: '85%' }]}>
-                <View style={modalStyles.modalHeader}>
+                <LinearGradient
+                    colors={[Colors.primary, Colors.primaryLight]}
+                    style={modalStyles.modalHeader}
+                >
                     <View style={modalStyles.titleContainer}>
-                        <FontAwesome5 name="hammer" size={24} color={Colors.primary} />
+                        <FontAwesome5 name="hammer" size={24} color="#fff" />
                         <Text style={modalStyles.modalTitle}>Saint Joseph</Text>
                     </View>
                     <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
-                        <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                        <Ionicons name="close" size={24} color="#fff" />
                     </TouchableOpacity>
-                </View>
+                </LinearGradient>
                 
                 <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
                     <View style={modalStyles.saintHeader}>
-                        <View style={modalStyles.saintBadge}>
-                            <FontAwesome5 name="cross" size={20} color={Colors.cardBackground} />
-                        </View>
+                        <LinearGradient
+                            colors={[Colors.secondary, Colors.secondaryLight]}
+                            style={modalStyles.saintBadge}
+                        >
+                            <FontAwesome5 name="cross" size={20} color={Colors.primary} />
+                        </LinearGradient>
                         <Text style={modalStyles.saintSubtitle}>Patron Saint of Workers</Text>
                     </View>
                     
@@ -331,29 +349,38 @@ const MissionVisionModal = ({ isVisible, onClose }) => (
     >
         <View style={modalStyles.centeredView}>
             <View style={[modalStyles.modalView, { maxHeight: '90%' }]}>
-                <View style={modalStyles.modalHeader}>
+                <LinearGradient
+                    colors={[Colors.primary, Colors.primaryLight]}
+                    style={modalStyles.modalHeader}
+                >
                     <View style={modalStyles.titleContainer}>
-                        <Ionicons name="business" size={24} color={Colors.primary} />
+                        <Ionicons name="business" size={24} color="#fff" />
                         <Text style={modalStyles.modalTitle}>Mission & Vision</Text>
                     </View>
                     <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
-                        <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                        <Ionicons name="close" size={24} color="#fff" />
                     </TouchableOpacity>
-                </View>
+                </LinearGradient>
                 
                 <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
                     {/* MISSION SECTION */}
                     <View style={modalStyles.missionVisionCard}>
-                        <View style={[modalStyles.cardHeader, { backgroundColor: Colors.primary }]}>
-                            <Ionicons name="rocket" size={20} color={Colors.cardBackground} />
+                        <LinearGradient
+                            colors={[Colors.primary, Colors.primaryLight]}
+                            style={modalStyles.cardHeader}
+                        >
+                            <Ionicons name="rocket" size={20} color="#fff" />
                             <Text style={modalStyles.cardTitle}>MISSION OF THE PARISH</Text>
-                        </View>
+                        </LinearGradient>
                         <View style={modalStyles.missionContent}>
                             {missionVisionData.mission.map((item, index) => (
                                 <View key={index} style={modalStyles.missionItem}>
-                                    <View style={modalStyles.missionNumber}>
+                                    <LinearGradient
+                                        colors={[Colors.primary, Colors.primaryLight]}
+                                        style={modalStyles.missionNumber}
+                                    >
                                         <Text style={modalStyles.missionNumberText}>{index + 1}</Text>
-                                    </View>
+                                    </LinearGradient>
                                     <Text style={modalStyles.missionText}>{item}</Text>
                                 </View>
                             ))}
@@ -362,10 +389,13 @@ const MissionVisionModal = ({ isVisible, onClose }) => (
 
                     {/* VISION SECTION */}
                     <View style={modalStyles.missionVisionCard}>
-                        <View style={[modalStyles.cardHeader, { backgroundColor: Colors.secondary }]}>
-                            <Ionicons name="eye" size={20} color={Colors.cardBackground} />
+                        <LinearGradient
+                            colors={[Colors.secondary, Colors.secondaryLight]}
+                            style={modalStyles.cardHeader}
+                        >
+                            <Ionicons name="eye" size={20} color={Colors.primary} />
                             <Text style={modalStyles.cardTitle}>VISION OF THE PARISH</Text>
-                        </View>
+                        </LinearGradient>
                         <View style={modalStyles.visionContent}>
                             <Text style={modalStyles.visionText}>{missionVisionData.vision}</Text>
                         </View>
@@ -386,15 +416,18 @@ const BaptismRemindersModal = ({ isVisible, onClose }) => (
     >
         <View style={modalStyles.centeredView}>
             <View style={[modalStyles.modalView, { maxHeight: '90%' }]}>
-                <View style={modalStyles.modalHeader}>
+                <LinearGradient
+                    colors={[Colors.primary, Colors.primaryLight]}
+                    style={modalStyles.modalHeader}
+                >
                     <View style={modalStyles.titleContainer}>
-                        <FontAwesome5 name="water" size={24} color={Colors.primary} />
+                        <FontAwesome5 name="water" size={24} color="#fff" />
                         <Text style={modalStyles.modalTitle}>Baptism Guidelines</Text>
                     </View>
                     <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
-                        <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                        <Ionicons name="close" size={24} color="#fff" />
                     </TouchableOpacity>
-                </View>
+                </LinearGradient>
                 
                 <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
                     <Text style={modalStyles.reminderNote}>BASAHIN PONG MABUTI</Text>
@@ -441,9 +474,12 @@ const BaptismRemindersModal = ({ isVisible, onClose }) => (
                         <Text style={modalStyles.requirementsTitle}>REQUIREMENTS</Text>
                         {baptismReminders.requirements.map((requirement, index) => (
                             <View key={index} style={modalStyles.requirementItem}>
-                                <View style={modalStyles.requirementBullet}>
+                                <LinearGradient
+                                    colors={[Colors.primary, Colors.primaryLight]}
+                                    style={modalStyles.requirementBullet}
+                                >
                                     <Text style={modalStyles.requirementNumber}>{index + 1}</Text>
-                                </View>
+                                </LinearGradient>
                                 <Text style={modalStyles.requirementText}>{requirement}</Text>
                             </View>
                         ))}
@@ -464,22 +500,28 @@ const FormRemindersModal = ({ isVisible, onClose }) => (
     >
         <View style={modalStyles.centeredView}>
             <View style={[modalStyles.modalView, { maxHeight: '85%' }]}>
-                <View style={modalStyles.modalHeader}>
+                <LinearGradient
+                    colors={[Colors.primary, Colors.primaryLight]}
+                    style={modalStyles.modalHeader}
+                >
                     <View style={modalStyles.titleContainer}>
-                        <Ionicons name="document-text" size={24} color={Colors.primary} />
+                        <Ionicons name="document-text" size={24} color="#fff" />
                         <Text style={modalStyles.modalTitle}>Form Guidelines</Text>
                     </View>
                     <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
-                        <Ionicons name="close" size={24} color={Colors.textSecondary} />
+                        <Ionicons name="close" size={24} color="#fff" />
                     </TouchableOpacity>
-                </View>
+                </LinearGradient>
                 
                 <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
                     <View style={modalStyles.remindersContainer}>
-                        <View style={modalStyles.importantNotice}>
-                            <Ionicons name="warning" size={20} color={Colors.secondary} />
+                        <LinearGradient
+                            colors={[Colors.lightGold, '#fef7cd']}
+                            style={modalStyles.importantNotice}
+                        >
+                            <Ionicons name="warning" size={20} color={Colors.secondaryDark} />
                             <Text style={modalStyles.importantNoticeText}>MGA MAHALAGANG PAALALA</Text>
-                        </View>
+                        </LinearGradient>
                         
                         {formReminders.map((reminder, index) => (
                             <View key={index} style={modalStyles.reminderItem}>
@@ -585,13 +627,17 @@ const HomeScreen = ({ navigation }) => {
             item.type === 'sunday' && styles.sundayCard
         ]}>
             <View style={styles.scheduleHeader}>
-                <View style={[
-                    styles.dayBadge,
-                    item.type === 'special' && styles.specialBadge,
-                    item.type === 'sunday' && styles.sundayBadge
-                ]}>
+                <LinearGradient
+                    colors={item.type === 'special' ? 
+                        [Colors.secondary, Colors.secondaryLight] : 
+                        item.type === 'sunday' ? 
+                        [Colors.primaryLight, Colors.accentGreen] : 
+                        [Colors.primary, Colors.primaryLight]
+                    }
+                    style={styles.dayBadge}
+                >
                     <Text style={styles.dayBadgeText}>{item.day}</Text>
-                </View>
+                </LinearGradient>
                 {item.type === 'special' && (
                     <View style={styles.featuredBadge}>
                         <Ionicons name="star" size={12} color={Colors.cardBackground} />
@@ -630,7 +676,10 @@ const HomeScreen = ({ navigation }) => {
                 style={styles.carouselImage}
                 resizeMode="cover"
             />
-            <View style={styles.imageOverlay} />
+            <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.7)']}
+                style={styles.imageOverlay}
+            />
             <View style={styles.imageCaption}>
                 <Text style={styles.imageCaptionTitle}>{item.title}</Text>
                 <Text style={styles.imageCaptionSubtitle}>{item.caption}</Text>
@@ -677,13 +726,16 @@ const HomeScreen = ({ navigation }) => {
 
     const QuickActionButton = ({ icon, title, subtitle, color, onPress, iconType = 'ionicons' }) => (
         <TouchableOpacity style={styles.quickAction} onPress={onPress}>
-            <View style={[styles.quickActionIcon, { backgroundColor: color }]}>
+            <LinearGradient
+                colors={[color, Colors.primaryLight]}
+                style={styles.quickActionIcon}
+            >
                 {iconType === 'fontawesome' ? (
                     <FontAwesome5 name={icon} size={20} color={Colors.cardBackground} />
                 ) : (
                     <Ionicons name={icon} size={22} color={Colors.cardBackground} />
                 )}
-            </View>
+            </LinearGradient>
             <View style={styles.quickActionContent}>
                 <Text style={styles.quickActionTitle}>{title}</Text>
                 <Text style={styles.quickActionSubtitle}>{subtitle}</Text>
@@ -702,8 +754,13 @@ const HomeScreen = ({ navigation }) => {
             <FormRemindersModal isVisible={isFormRemindersModalVisible} onClose={() => setFormRemindersModalVisible(false)} />
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-                {/* HEADER */}
-                <View style={styles.header}>
+                {/* ENHANCED HEADER WITH GRADIENT */}
+                <LinearGradient
+                    colors={[Colors.primary, Colors.primaryLight, Colors.primaryDark]}
+                    style={styles.header}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
                     <View style={styles.headerMain}>
                         <View style={styles.headerText}>
                             <Text style={styles.greeting}>Welcome to</Text>
@@ -711,15 +768,20 @@ const HomeScreen = ({ navigation }) => {
                             <Text style={styles.location}>Rodriguez, Rizal</Text>
                         </View>
                         <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('NotificationScreen')}>
-                            <Ionicons name="notifications" size={26} color={Colors.primary} />
-                            {unreadCount > 0 && (
-                                <View style={styles.notificationBadge}>
-                                    <Text style={styles.badgeText}>{unreadCount}</Text>
-                                </View>
-                            )}
+                            <LinearGradient
+                                colors={[Colors.secondary, Colors.secondaryLight]}
+                                style={styles.notificationIcon}
+                            >
+                                <Ionicons name="notifications" size={22} color={Colors.primary} />
+                                {unreadCount > 0 && (
+                                    <View style={styles.notificationBadge}>
+                                        <Text style={styles.badgeText}>{unreadCount}</Text>
+                                    </View>
+                                )}
+                            </LinearGradient>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </LinearGradient>
 
                 {/* CAROUSEL */}
                 <View style={styles.carouselSection}>
@@ -800,10 +862,7 @@ const HomeScreen = ({ navigation }) => {
                             <Text style={styles.sectionTitle}>Mass Schedules</Text>
                             <Text style={styles.sectionSubtitle}>Weekly liturgical services</Text>
                         </View>
-                        <TouchableOpacity style={styles.viewAllBtn}>
-                            <Text style={styles.viewAllText}>View All</Text>
-                            <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
-                        </TouchableOpacity>
+                       
                     </View>
                     
                     <FlatList
@@ -849,34 +908,40 @@ const HomeScreen = ({ navigation }) => {
                 </View>
             </ScrollView>
 
-            {/* BOTTOM NAVIGATION */}
-            <View style={styles.bottomNav}>
+            {/* ENHANCED BOTTOM NAVIGATION (SAME AS PROFILE SCREEN) */}
+            <LinearGradient
+                colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}
+                style={styles.bottomNav}
+            >
                 <TouchableOpacity style={[styles.navItem, styles.navItemActive]}>
-                    <View style={styles.navIconActive}>
-                        <Ionicons name="home" size={24} color={Colors.primary} />
-                    </View>
+                    <LinearGradient
+                        colors={[Colors.primary, Colors.primaryLight]}
+                        style={styles.activeNavIcon}
+                    >
+                        <Ionicons name="home" size={22} color="#fff" />
+                    </LinearGradient>
                     <Text style={styles.navTextActive}>Home</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('MyRequests')}>
                     <View style={styles.navIcon}>
-                        <Ionicons name="calendar" size={24} color={Colors.textSecondary} />
+                        <Ionicons name="calendar" size={22} color={Colors.textSecondary} />
                     </View>
-                    <Text style={styles.navText}>Dashboard</Text>
+                    <Text style={styles.navText}>Requests</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Profile')}>
                     <View style={styles.navIcon}>
-                        <Ionicons name="person" size={24} color={Colors.textSecondary} />
+                        <Ionicons name="person" size={22} color={Colors.textSecondary} />
                     </View>
                     <Text style={styles.navText}>Profile</Text>
                 </TouchableOpacity>
-            </View>
+            </LinearGradient>
         </SafeAreaView>
     );
 };
 
-// --- SUPER GALACTIC MODAL STYLES ---
+// 🎨 GREEN THEME MODAL STYLES
 const modalStyles = StyleSheet.create({
     centeredView: {
         flex: 1,
@@ -887,8 +952,8 @@ const modalStyles = StyleSheet.create({
     modalView: {
         width: '90%',
         backgroundColor: Colors.cardBackground,
-        borderRadius: 20,
-        padding: 0,
+        borderRadius: 25,
+        overflow: 'hidden',
         alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
@@ -903,8 +968,6 @@ const modalStyles = StyleSheet.create({
         width: '100%',
         padding: 24,
         paddingBottom: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
     },
     titleContainer: {
         flexDirection: 'row',
@@ -913,14 +976,21 @@ const modalStyles = StyleSheet.create({
     modalTitle: {
         fontSize: 22,
         fontWeight: '700',
-        color: Colors.textPrimary,
+        color: '#fff',
         marginLeft: 12,
         letterSpacing: -0.5,
     },
     closeButton: {
         padding: 8,
         borderRadius: 12,
-        backgroundColor: Colors.background,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    gradientButton: {
+        paddingVertical: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 25,
+        width: '100%',
     },
     // Bible Verse Modal
     verseContainer: {
@@ -932,7 +1002,6 @@ const modalStyles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: Colors.lightGold,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 20,
@@ -963,11 +1032,14 @@ const modalStyles = StyleSheet.create({
         marginHorizontal: 16,
     },
     actionButton: {
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 32,
-        paddingVertical: 12,
         borderRadius: 25,
         marginTop: 16,
+        width: '80%',
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
     actionButtonText: {
         color: Colors.cardBackground,
@@ -985,7 +1057,6 @@ const modalStyles = StyleSheet.create({
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: Colors.secondary,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 12,
@@ -1072,7 +1143,6 @@ const modalStyles = StyleSheet.create({
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: Colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
@@ -1209,7 +1279,6 @@ const modalStyles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: Colors.accentBlue,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -1236,7 +1305,6 @@ const modalStyles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: Colors.lightGold,
         padding: 16,
         borderRadius: 12,
         marginBottom: 20,
@@ -1303,7 +1371,7 @@ const modalStyles = StyleSheet.create({
     },
 });
 
-// --- SUPER GALACTIC MAIN STYLES ---
+// 🎨 GREEN THEME MAIN STYLES
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
@@ -1312,20 +1380,19 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
     },
-    // HEADER
+    // ENHANCED HEADER WITH GRADIENT
     header: {
-        backgroundColor: Colors.cardBackground,
         paddingHorizontal: 24,
-        paddingTop: 20,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
+        paddingTop: 40,
+        paddingBottom: 30,
+        borderBottomLeftRadius: 35,
+        borderBottomRightRadius: 35,
+        marginBottom: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.2,
         shadowRadius: 20,
         elevation: 10,
-        marginBottom: 10,
     },
     headerMain: {
         flexDirection: 'row',
@@ -1337,27 +1404,42 @@ const styles = StyleSheet.create({
     },
     greeting: {
         fontSize: 16,
-        color: Colors.textSecondary,
+        color: 'rgba(255,255,255,0.9)',
         fontWeight: '600',
         marginBottom: 4,
     },
     parishName: {
         fontSize: 28,
         fontWeight: '800',
-        color: Colors.primary,
+        color: '#fff',
         marginBottom: 2,
         letterSpacing: -0.5,
+        textShadowColor: 'rgba(0,0,0,0.3)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
     },
     location: {
         fontSize: 16,
-        color: Colors.secondary,
+        color: Colors.secondaryLight,
         fontWeight: '600',
+        textShadowColor: 'rgba(0,0,0,0.2)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
     notificationBtn: {
-        padding: 12,
-        borderRadius: 16,
-        backgroundColor: Colors.lightBlue,
-        position: 'relative',
+        padding: 4,
+    },
+    notificationIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
     notificationBadge: {
         position: 'absolute',
@@ -1370,7 +1452,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: Colors.cardBackground,
+        borderColor: Colors.primary,
     },
     badgeText: {
         color: Colors.cardBackground,
@@ -1392,7 +1474,6 @@ const styles = StyleSheet.create({
     },
     imageOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.3)',
     },
     imageCaption: {
         position: 'absolute',
@@ -1407,11 +1488,17 @@ const styles = StyleSheet.create({
         color: Colors.cardBackground,
         marginBottom: 4,
         letterSpacing: -0.5,
+        textShadowColor: 'rgba(0,0,0,0.8)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 5,
     },
     imageCaptionSubtitle: {
         fontSize: 16,
         color: Colors.secondaryLight,
         fontWeight: '600',
+        textShadowColor: 'rgba(0,0,0,0.8)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
     },
     dotContainer: {
         flexDirection: 'row',
@@ -1540,16 +1627,9 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     dayBadge: {
-        backgroundColor: Colors.primary,
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 12,
-    },
-    specialBadge: {
-        backgroundColor: Colors.secondary,
-    },
-    sundayBadge: {
-        backgroundColor: Colors.primaryLight,
     },
     dayBadgeText: {
         color: Colors.cardBackground,
@@ -1623,7 +1703,7 @@ const styles = StyleSheet.create({
         color: Colors.cardBackground,
         letterSpacing: 0.3,
     },
-    // BOTTOM NAVIGATION
+    // ENHANCED BOTTOM NAVIGATION (SAME AS PROFILE SCREEN)
     bottomNav: {
         flexDirection: 'row',
         justifyContent: 'space-around',
@@ -1654,21 +1734,29 @@ const styles = StyleSheet.create({
         padding: 8,
         borderRadius: 12,
     },
-    navIconActive: {
-        backgroundColor: Colors.lightBlue,
-        padding: 8,
-        borderRadius: 12,
+    activeNavIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 4,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
     },
     navText: {
         fontSize: 12,
         color: Colors.textSecondary,
-        marginTop: 4,
+        marginTop: 2,
         fontWeight: '500',
     },
     navTextActive: {
         fontSize: 12,
         color: Colors.primary,
-        marginTop: 4,
+        marginTop: 2,
         fontWeight: '700',
     },
 });

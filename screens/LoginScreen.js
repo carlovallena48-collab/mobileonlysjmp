@@ -217,7 +217,7 @@ export default function LoginScreen({ navigation }) {
         />
     </View>
 </View>
-                        <Text style={styles.appName}>San Jose Manggagawa Parish App</Text>
+                        <Text style={styles.appName}>San Jose Manggagawa Parish </Text>
                         <Text style={styles.welcomeText}>Welcome Back!</Text>
                     </View>
                 </LinearGradient>
@@ -313,19 +313,17 @@ export default function LoginScreen({ navigation }) {
                                 disabled={googleLoading || loading}
                             >
                                 {googleLoading ? (
-                                    <ActivityIndicator size="small" color="#FFF" />
+                                    <ActivityIndicator size="small" color="#070606ff" />
                                 ) : (
                                     <>
-                                        <Ionicons name="logo-google" size={20} color="#fff" />
+                                        <Ionicons name="logo-google" size={20} color="#ef3a08ff" />
                                         <Text style={styles.socialButtonText}>Sign in with Google</Text>
                                     </>
                                 )}
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.noteText}>
-                            Make sure your Google OAuth is properly configured
-                        </Text>
+                       
                     </View>
 
                     <View style={styles.signUpContainer}>
@@ -513,7 +511,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100%',
+        width: '60%',
         paddingVertical: 14,
         paddingHorizontal: 20,
         borderRadius: 12,
@@ -524,10 +522,10 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     googleButton: {
-        backgroundColor: '#DB4437',
+        backgroundColor: '#ecdedcff',
     },
     socialButtonText: {
-        color: '#fff',
+        color: '#131212ff',
         fontWeight: '600',
         fontSize: 16,
         marginLeft: 12,
