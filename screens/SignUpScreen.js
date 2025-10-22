@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     Animated,
     Easing,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ export default function SignUpScreen({ navigation }) {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [requiresVerification, setRequiresVerification] = useState(false);
 
     // Premium Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -73,6 +75,20 @@ export default function SignUpScreen({ navigation }) {
             Alert.alert('Error', 'Please fill in all fields.');
             return;
         }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            Alert.alert('Error', 'Please enter a valid email address.');
+            return;
+        }
+
+        // Password validation
+        if (password.length < 6) {
+            Alert.alert('Error', 'Password must be at least 6 characters long.');
+            return;
+        }
+
         if (password !== confirmPassword) {
             Alert.alert('Error', 'Passwords do not match.');
             return;
@@ -110,11 +126,51 @@ export default function SignUpScreen({ navigation }) {
                 'http://192.168.100.199:5000/api/signup',
                 { fullName, email, password, address, contact, role: "Member" }
             );
-            Alert.alert('Success', response.data.message);
-            navigation.navigate('Login');
+
+            if (response.data.requiresVerification) {
+                setRequiresVerification(true);
+                Alert.alert(
+                    'Verification Required', 
+                    response.data.message,
+                    [
+                        {
+                            text: 'Open Email',
+                            onPress: () => Linking.openURL('mailto:')
+                        },
+                        {
+                            text: 'OK',
+                            style: 'default'
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert('Success', response.data.message);
+                navigation.navigate('Login');
+            }
         } catch (err) {
             console.log('AXIOS ERROR DETAIL:', err.response?.data, err.message);
             Alert.alert('Error', err.response?.data?.message || err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResendVerification = async () => {
+        if (!email) {
+            Alert.alert('Error', 'Email is required to resend verification.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const response = await axios.post('http://192.168.100.199:5000/api/resend-verification', {
+                email: email.trim().toLowerCase()
+            });
+
+            Alert.alert('Success', response.data.message);
+        } catch (err) {
+            console.log('Resend verification error:', err.response?.data, err.message);
+            Alert.alert('Error', err.response?.data?.message || 'Failed to resend verification email.');
         } finally {
             setLoading(false);
         }
@@ -176,6 +232,25 @@ export default function SignUpScreen({ navigation }) {
                         }
                     ]}>
                         
+                        {/* Verification Banner */}
+                        {requiresVerification && (
+                            <View style={styles.verificationBanner}>
+                                <Ionicons name="mail-outline" size={24} color="#FFFFFF" />
+                                <View style={styles.verificationTextContainer}>
+                                    <Text style={styles.verificationTitle}>Check Your Email</Text>
+                                    <Text style={styles.verificationMessage}>
+                                        We sent a verification link to {email}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={() => Linking.openURL('mailto:')}
+                                    style={styles.openEmailButton}
+                                >
+                                    <Text style={styles.openEmailText}>Open Email</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
                         {/* Full Name Input with Premium Styling */}
                         <View style={styles.inputSection}>
                             <Text style={styles.label}>Full Name</Text>
@@ -250,7 +325,7 @@ export default function SignUpScreen({ navigation }) {
                                 <Ionicons name="lock-closed-outline" size={22} color="#10B981" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Create password"
+                                    placeholder="Create password (min. 6 characters)"
                                     placeholderTextColor="rgba(255,255,255,0.6)"
                                     value={password}
                                     secureTextEntry={!showPassword}
@@ -335,6 +410,19 @@ export default function SignUpScreen({ navigation }) {
                             </TouchableOpacity>
                         </Animated.View>
 
+                        {/* Resend Verification Button */}
+                        {requiresVerification && (
+                            <TouchableOpacity 
+                                style={styles.resendButton}
+                                onPress={handleResendVerification}
+                                disabled={loading}
+                            >
+                                <Text style={styles.resendButtonText}>
+                                    Didn't receive email? Resend Verification
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
                         {/* Login Redirect with Premium Styling */}
                         <TouchableOpacity 
                             onPress={handleLoginRedirect} 
@@ -361,6 +449,7 @@ export default function SignUpScreen({ navigation }) {
         </SafeAreaView>
     );
 }
+
 
 const styles = StyleSheet.create({
     safeArea: {
@@ -593,5 +682,56 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.4)',
         fontWeight: '400',
         letterSpacing: 1,
+    },
+  verificationBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        borderRadius: 15,
+        padding: 15,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(16, 185, 129, 0.5)',
+    },
+    verificationTextContainer: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    verificationTitle: {
+        color: '#FFFFFF',
+        fontWeight: '700',
+        fontSize: 16,
+        marginBottom: 2,
+    },
+    verificationMessage: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 14,
+    },
+    openEmailButton: {
+        backgroundColor: 'rgba(16, 185, 129, 0.3)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#10B981',
+    },
+    openEmailText: {
+        color: '#10B981',
+        fontWeight: '600',
+        fontSize: 12,
+    },
+    resendButton: {
+        backgroundColor: 'rgba(255, 193, 7, 0.2)',
+        padding: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 193, 7, 0.5)',
+    },
+    resendButtonText: {
+        color: '#FFC107',
+        fontWeight: '600',
+        fontSize: 14,
     },
 });

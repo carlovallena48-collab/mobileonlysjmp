@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
-const bcrypt = require("bcrypt");
+
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { ObjectId } = require("mongodb"); 
 const connectDB = require("./connect.cjs");
 const { OAuth2Client } = require('google-auth-library');
@@ -12,7 +14,9 @@ require("dotenv").config({ path: "./config.env" });
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-
+// JWT Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key_here_make_it_very_long_and_secure';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -62,42 +66,249 @@ const upload = multer({
 app.use("/uploads", express.static(uploadDir));
 
 // =======================
-// SIGNUP ROUTE
+// UPDATED SIGNUP ROUTE WITH EMAIL VERIFICATION
 // =======================
 app.post("/api/signup", async (req, res) => {
   try {
     const { fullName, email, password, address, contact, role } = req.body;
 
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address." });
+    }
+
+    // Check if user already exists
     const existingUser = await db.collection("users").findOne({ email: email.trim().toLowerCase() });
     if (existingUser) {
-        return res.status(409).json({ message: "Email already registered." });
+      return res.status(409).json({ message: "Email already registered." });
+    }
+
+    // Password validation
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     const newUser = {
       fullName: fullName?.trim(),
       email: email.trim().toLowerCase(),
       password: hashedPassword,
-      address: address?.trim() || null, 
-      contact: contact?.trim() || null, 
+      address: address?.trim() || null,
+      contact: contact?.trim() || null,
       role: role || "Member",
-      profileImage: "https://i.ibb.co/L95zB7X/emojiprofile.png", 
+      profileImage: "https://i.ibb.co/L95zB7X/emojiprofile.png",
+      isVerified: false,
+      verificationToken,
+      verificationExpires,
       createdAt: new Date(),
     };
 
     const result = await db.collection("users").insertOne(newUser);
     console.log("✅ User inserted:", result.insertedId);
 
-    res.json({ message: "Signup successful", userId: result.insertedId });
+    // Send verification email
+    try {
+      const verificationUrl = `http://192.168.100.199:5000/api/verify-email?token=${verificationToken}`;
+      
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: {
+          name: 'SJMP Parish App',
+          address: process.env.EMAIL_USER
+        },
+        to: email,
+        subject: "Verify Your Email Address - SJMP Parish App",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1F7A8C;">Email Verification Required</h2>
+            <p>Hello ${fullName},</p>
+            <p>Thank you for registering with SJMP Parish App!</p>
+            <p>Please verify your email address by clicking the button below:</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" 
+                 style="background-color: #1F7A8C; color: white; padding: 15px 30px; 
+                        text-decoration: none; border-radius: 8px; display: inline-block;
+                        font-size: 16px; font-weight: bold;">
+                Verify Email Address
+              </a>
+            </div>
+            <p><strong>This link will expire in 24 hours.</strong></p>
+            <p>If you didn't create an account, please ignore this email.</p>
+            <br>
+            <p>Best regards,<br>SJMP Parish App Team</p>
+          </div>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log('✅ Verification email sent to:', email);
+
+      res.status(201).json({ 
+        message: "Registration successful! Please check your email to verify your account.",
+        requiresVerification: true
+      });
+
+    } catch (emailError) {
+      console.error('❌ Email sending error:', emailError);
+      // Still return success but inform user to contact support
+      res.status(201).json({ 
+        message: "Registration successful but verification email failed. Please contact support.",
+        requiresVerification: true
+      });
+    }
+
   } catch (err) {
     console.error("Signup error:", err);
-    res.status(500).json({ message: "Something went wrong." });
+    res.status(500).json({ message: "Something went wrong during registration." });
   }
 });
 
 // =======================
-// LOGIN ROUTE
+// EMAIL VERIFICATION ROUTE
+// =======================
+app.get("/api/verify-email", async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ message: "Verification token is required." });
+    }
+
+    const user = await db.collection("users").findOne({
+      verificationToken: token,
+      verificationExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired verification token." });
+    }
+
+    // Mark user as verified and clear token
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          isVerified: true,
+          updatedAt: new Date()
+        },
+        $unset: {
+          verificationToken: "",
+          verificationExpires: ""
+        }
+      }
+    );
+
+    res.json({ 
+      success: true,
+      message: "Email verified successfully! You can now login to your account." 
+    });
+    
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ message: "Server error during email verification." });
+  }
+});
+
+// =======================
+// RESEND VERIFICATION EMAIL
+// =======================
+app.post("/api/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await db.collection("users").findOne({ 
+      email: email.trim().toLowerCase(),
+      isVerified: false 
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: "User not found or already verified." 
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // Update user with new token
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          verificationToken,
+          verificationExpires,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    // Send verification email
+    const verificationUrl = `http://192.168.100.199:5000/api/verify-email?token=${verificationToken}`;
+    
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: {
+        name: 'SJMP Parish App',
+        address: process.env.EMAIL_USER
+      },
+      to: email,
+      subject: "Verify Your Email Address - SJMP Parish App",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1F7A8C;">Email Verification Required</h2>
+          <p>Hello ${user.fullName},</p>
+          <p>We received a request to resend your verification email.</p>
+          <p>Please verify your email address by clicking the button below:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verificationUrl}" 
+               style="background-color: #1F7A8C; color: white; padding: 15px 30px; 
+                      text-decoration: none; border-radius: 8px; display: inline-block;
+                      font-size: 16px; font-weight: bold;">
+              Verify Email Address
+            </a>
+          </div>
+          <p><strong>This link will expire in 24 hours.</strong></p>
+          <p>If you didn't request this, please ignore this email.</p>
+          <br>
+          <p>Best regards,<br>SJMP Parish App Team</p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ 
+      message: "Verification email sent successfully! Please check your email." 
+    });
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ message: "Failed to resend verification email." });
+  }
+});
+// =======================
+// UPDATED LOGIN ROUTE WITH JWT
 // =======================
 app.post("/api/login", async (req, res) => {
   if (!db) return res.status(500).json({ message: "Database not connected yet." });
@@ -116,10 +327,30 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password." });
     }
 
+    // Check if email is verified
+    if (!user.isVerified) {
+      return res.status(401).json({ 
+        message: "Please verify your email address before logging in.",
+        requiresVerification: true
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role 
+      },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
     const { password: _, ...userWithoutPassword } = user;
 
     res.json({
       message: "Login successful",
+      token,
       user: userWithoutPassword,
     });
   } catch (err) {
@@ -127,6 +358,54 @@ app.post("/api/login", async (req, res) => {
     res.status(500).json({ message: "Something went wrong." });
   }
 });
+
+// =======================
+// JWT AUTH MIDDLEWARE
+// =======================
+const authMiddleware = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await db.collection("users").findOne({ _id: new ObjectId(decoded.userId) });
+    
+    if (!user) {
+      return res.status(401).json({ message: 'Token invalid. User not found.' });
+    }
+
+    if (!user.isVerified) {
+      return res.status(401).json({ message: 'Please verify your email first.' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    res.status(401).json({ message: 'Invalid token.' });
+  }
+};
+
+// =======================
+// PROTECTED PROFILE ROUTE EXAMPLE
+// =======================
+app.get("/api/protected-profile", authMiddleware, async (req, res) => {
+  try {
+    const user = await db.collection("users").findOne(
+      { _id: req.user._id },
+      { projection: { password: 0 } }
+    );
+
+    res.json({ user });
+  } catch (error) {
+    console.error('Protected profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 
 // =======================
 // GOOGLE AUTH ROUTE

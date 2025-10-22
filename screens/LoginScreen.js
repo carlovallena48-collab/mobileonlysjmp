@@ -150,38 +150,67 @@ export default function LoginScreen({ navigation }) {
         }
 
         setLoading(true);
-        try {
-            const response = await axios.post('http://192.168.100.199:5000/api/login', {
-                email: email.trim().toLowerCase(),
-                password,
-            });
+    try {
+        const response = await axios.post('http://192.168.100.199:5000/api/login', {
+            email: email.trim().toLowerCase(),
+            password,
+        });
 
-            if (response.data.user) {
-                await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.data.user));
-            }
-
-            Alert.alert('Success', response.data.message || 'Login successful!');
-
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Home' }],
-            });
-        } catch (err) {
-            console.log('❌ LOGIN ERROR:', err.response?.data || err.message);
-            
-            let errorMessage = 'Login failed. Please try again.';
-            if (err.response?.data?.message) {
-                errorMessage = err.response.data.message;
-            } else if (err.code === 'NETWORK_ERROR') {
-                errorMessage = 'Network error. Please check your connection.';
-            }
-            
-            Alert.alert('Error', errorMessage);
-        } finally {
-            setLoading(false);
+        if (response.data.user) {
+            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(response.data.user));
         }
-    };
 
+        Alert.alert('Success', response.data.message || 'Login successful!');
+
+        navigation.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+        });
+    } catch (err) {
+        console.log('❌ LOGIN ERROR:', err.response?.data || err.message);
+        
+        let errorMessage = 'Login failed. Please try again.';
+        
+        if (err.response?.data?.message) {
+            errorMessage = err.response.data.message;
+            
+            // Handle email verification requirement
+            if (err.response.data.requiresVerification) {
+                Alert.alert(
+                    'Email Verification Required',
+                    errorMessage,
+                    [
+                        {
+                            text: 'Resend Verification',
+                            onPress: () => resendVerification(email)
+                        },
+                        {
+                            text: 'OK',
+                            style: 'default'
+                        }
+                    ]
+                );
+                return;
+            }
+        } else if (err.code === 'NETWORK_ERROR') {
+            errorMessage = 'Network error. Please check your connection.';
+        }
+        
+        Alert.alert('Error', errorMessage);
+    } finally {
+        setLoading(false);
+    }
+};
+const resendVerification = async (email) => {
+    try {
+        const response = await axios.post('http://192.168.100.199:5000/api/resend-verification', {
+            email: email.trim().toLowerCase()
+        });
+        Alert.alert('Success', response.data.message);
+    } catch (err) {
+        Alert.alert('Error', 'Failed to resend verification email.');
+    }
+};
     const handleContactSupport = () => {
         Alert.alert(
             'Contact Support',
