@@ -151,7 +151,7 @@ const HolyOrderForm = () => {
 
       console.log('📤 Submitting Holy Orders request:', submissionData);
       
-      const response = await fetch('http://192.168.100.199:5000/api/holy_orders_requests', {
+      const response = await fetch('http://192.168.1.42:5000/api/holy_orders_requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

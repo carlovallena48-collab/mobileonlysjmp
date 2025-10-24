@@ -100,7 +100,7 @@ export default function LoginScreen({ navigation }) {
         try {
             console.log('📤 Sending access token to backend...');
             
-            const response = await axios.post('http://192.168.100.199:5000/auth/google/expo', {
+            const response = await axios.post('http://192.168.1.42:5000/auth/google/expo', {
                 accessToken: accessToken
             });
 
@@ -151,7 +151,7 @@ export default function LoginScreen({ navigation }) {
 
         setLoading(true);
     try {
-        const response = await axios.post('http://192.168.100.199:5000/api/login', {
+        const response = await axios.post('http://192.168.1.42:5000/api/login', {
             email: email.trim().toLowerCase(),
             password,
         });
@@ -203,7 +203,7 @@ export default function LoginScreen({ navigation }) {
 };
 const resendVerification = async (email) => {
     try {
-        const response = await axios.post('http://192.168.100.199:5000/api/resend-verification', {
+        const response = await axios.post('http://192.168.1.42:5000/api/resend-verification', {
             email: email.trim().toLowerCase()
         });
         Alert.alert('Success', response.data.message);

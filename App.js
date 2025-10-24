@@ -60,7 +60,7 @@ export default function App() {
         <Stack.Screen name="ScheduleDetailScreen" component={ScheduleDetailScreen} />
         <Stack.Screen name="PamisaForm" component={PamisaFormScreen} />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-   <Stack.Screen  name="NotificationScreen"  component= {NotificationScreen} options= {{   title: 'Notifications',headerShown: true   }}/>
+   <Stack.Screen  name="NotificationScreen"  component= {NotificationScreen}/>
        <Stack.Screen name="FirstCommunionForm" component={FirstCommunionFormScreen} />
         <Stack.Screen 
           name="BlessingForm" 

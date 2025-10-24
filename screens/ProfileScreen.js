@@ -239,7 +239,7 @@ const ProfileScreen = () => {
     
     const navigation = useNavigation();
     
-    const API_BASE_URL = `http://192.168.100.199:5000`; 
+    const API_BASE_URL = `http://192.168.1.42:5000`; 
     const PROFILE_IMAGE_DEFAULT = "https://i.ibb.co/L95zB7X/emojiprofile.png";
     const ASYNC_IMAGE_KEY_PREFIX = "@user_profile_image_";
 
@@ -1281,7 +1281,7 @@ By using the San Jose Manggagawa Parish mobile application, you acknowledge that
                     style={styles.navItem}
                     activeOpacity={0.7}
                 >
-                    <Ionicons name="calendar" size={22} color={COLORS.textGray} />
+                    <Ionicons name="grid" size={22} color={COLORS.textGray} />
                     <Text style={styles.navText}>Requests</Text>
                 </TouchableOpacity>
                 <TouchableOpacity

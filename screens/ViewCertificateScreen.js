@@ -23,7 +23,7 @@ const SECONDARY_COLOR = '#34d399';
 const BACKGROUND_COLOR = '#f0fdfa';
 const CARD_BACKGROUND = '#ffffff';
 
-const API_URL = "http://192.168.100.199:5000/api";
+const API_URL = "http://192.168.1.42:5000/api";
 const USER_STORAGE_KEY = '@userData';
 
 // Reason Modal Component

@@ -271,7 +271,7 @@ export default function SickCallFormScreen({ navigation, route }) {
     });
     
     try {
-      const SERVER_URL = 'http://192.168.100.199:5000';
+      const SERVER_URL = 'http://192.168.1.42:5000';
       
       console.log('🚀 Sending request to:', `${SERVER_URL}/api/sickcall_requests`);
       

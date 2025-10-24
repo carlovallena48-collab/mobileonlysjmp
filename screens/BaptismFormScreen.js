@@ -11,7 +11,7 @@ import { Calendar } from 'react-native-calendars';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 const { width, height } = Dimensions.get('window');
-const API_URL = "http://192.168.100.199:5000/api/baptismrequests";
+const API_URL = "http://192.168.1.42:5000/api/baptismrequests";
 const USER_STORAGE_KEY = '@userData';
 const NOTIFICATION_STORAGE_KEY = '@notificationHistory';
 
@@ -32,12 +32,12 @@ const Colors = {
 };
 
 const maritalStatusOptions = [
-    { value: 'Married', label: 'Married' },
-    { value: 'Single Parent', label: 'Single Parent' },
-    { value: 'Separated', label: 'Separated' },
-    { value: 'Widowed', label: 'Widowed' },
+    { value: 'Katoliko Romano', label: 'Katoliko Romano' },
+    { value: 'Civil', label: 'Civil' },
+    { value: 'Di pa Kasal', label: 'Di pa Kasal' },
+    { value: 'Agipay', label: 'Agipay' },
+    { value: 'Protestante', label: 'Protestante' },
 ];
-
 // BAPTISM REMINDERS DATA - UPDATED WITH YOUR CONTENT
 const baptismReminders = {
     title: "MGA PAALALA!",

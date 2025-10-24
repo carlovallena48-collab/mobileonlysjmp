@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,11 @@ import {
   StatusBar,
   SafeAreaView,
   Image,
-  FlatList,
   Alert,
   Dimensions,
   Animated,
   Modal,
+  Easing,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,44 +27,73 @@ import holyorders from "../assets/holyorders.png";
 import matrimony from "../assets/matrimony.png";
 import churchLogo from "../assets/LOGO.png";
 
-const otherservicesIcon = "add-circle-outline";
 const { width, height } = Dimensions.get("window");
 
-// 🌿 GREEN THEME COLOR PALETTE - Premium Design
+// 📱 RESPONSIVE SIZING
+const isSmallDevice = width < 375;
+const isLargeDevice = width > 414;
+const cardWidth = (width - 60) / (isSmallDevice ? 2 : 3);
+const cardHeight = isSmallDevice ? 140 : 120;
+
+// 🎨 CLEAN WHITE THEME COLOR PALETTE
 const PRIMARY_COLOR = "#1a5e1a";           // Deep Forest Green
 const PRIMARY_LIGHT = "#2e7d32";          // Medium Green
-const PRIMARY_DARK = "#0d3d0d";           // Dark Green
-const SECONDARY_COLOR = "#f2f2f0ff";        // Gold
-const SECONDARY_LIGHT = "#f0f0eaff";        // Light Gold
-const BACKGROUND_COLOR = "#f8fafc";       // Clean White/Light Gray
-const CARD_BACKGROUND = "#ffffff";        // Pure White
+const ACCENT_COLOR = "#d4af37";           // Luxury Gold
+const BACKGROUND_COLOR = "#ffffff";       // Pure White Background
+const CARD_BACKGROUND = "#f8fafc";        // Light Card
 const TEXT_PRIMARY = "#1e293b";           // Deep Navy
 const TEXT_SECONDARY = "#64748b";         // Slate Gray
+const BORDER_COLOR = "#e2e8f0";           // Light Border
 
-// 🎨 UPDATED SACRAMENT COLORS - Green Theme Harmony
-const SACRAMENT_COLORS = {
-  Baptism: { main: "#e0f2fe", dark: "#065f46", gradient: ["#e0f2fe", "#bae6fd"] },
-  Eucharist: { main: "#fef3c7", dark: "#92400e", gradient: ["#fef3c7", "#fde68a"] },
-  Reconciliation: { main: "#d1fae5", dark: "#059669", gradient: ["#d1fae5", "#a7f3d0"] },
-  Confirmation: { main: "#fce7f6", dark: "#9d174d", gradient: ["#fce7f6", "#fbcfe8"] },
-  Matrimony: { main: "#fee2e2", dark: "#dc2626", gradient: ["#fee2e2", "#fecaca"] },
-  HolyOrders: { main: "#dbeafe", dark: "#1e40af", gradient: ["#dbeafe", "#bfdbfe"] },
-  Annointing: { main: "#fff7ed", dark: "#d97706", gradient: ["#fff7ed", "#fed7aa"] },
-  Other: { main: "#e5e7eb", dark: "#4b5563", gradient: ["#e5e7eb", "#d1d5db"] },
+// ✨ FLOATING ANIMATION COMPONENT
+const FloatingElement = ({ children, duration = 2000 }) => {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: 1,
+          duration: duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: duration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const floatStyle = {
+    transform: [
+      {
+        translateY: floatAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -5],
+        }),
+      },
+    ],
+  };
+
+  return <Animated.View style={floatStyle}>{children}</Animated.View>;
 };
 
 const sacraments = [
-  { id: "s1", name: "Binyag", shortName: "Baptism", image: baptism, route: "BaptismForm", colors: SACRAMENT_COLORS.Baptism },
-  { id: "s2", name: "First Communion", shortName: "Eucharist", image: eucharist, route: "FirstCommunionForm", colors: SACRAMENT_COLORS.Eucharist },
-  { id: "s3", name: "Kumpisal", shortName: "Reconciliation", image: confession, route: "KumpisalForm", colors: SACRAMENT_COLORS.Reconciliation },
-  { id: "s4", name: "Kumpil", shortName: "Confirmation", image: confirmation, route: "KumpilForm", colors: SACRAMENT_COLORS.Confirmation },
-  { id: "s5", name: "Wedding", shortName: "Matrimony", image: matrimony, route: "MarriageForm", colors: SACRAMENT_COLORS.Matrimony },
-  { id: "s6", name: "Banal na Orden", shortName: "Holy Orders", image: holyorders, route: "HolyOrdenForm", colors: SACRAMENT_COLORS.HolyOrders },
-  { id: "s7", name: "Pagpapahid ng Langis", shortName: "Annointing", image: annointing, route: "SickCallForm", colors: SACRAMENT_COLORS.Annointing },
-  { id: "other", name: "Other Services", shortName: "Requests", image: null, route: "OtherServices", colors: SACRAMENT_COLORS.Other },
+  { id: "s1", name: "Binyag", icon: "💧", color: "#00d4aa", gradient: ["#e0f7fa", "#b2ebf2"], route: "BaptismForm" },
+  { id: "s2", name: "First Communion", icon: "🍞", color: "#fdcb6e", gradient: ["#fff8e1", "#ffecb3"], route: "FirstCommunionForm" },
+  { id: "s3", name: "Kumpisal", icon: "🙏", color: "#74b9ff", gradient: ["#e8f5e9", "#c8e6c9"], route: "KumpisalForm" },
+  { id: "s4", name: "Kumpil", icon: "🔥", color: "#ff7675", gradient: ["#fce4ec", "#f8bbd0"], route: "KumpilForm" },
+  { id: "s5", name: "Wedding", icon: "💍", color: "#a29bfe", gradient: ["#fbe9e7", "#ffccbc"], route: "MarriageForm" },
+  { id: "s6", name: "Holy Orders", icon: "⛪", color: "#fd79a8", gradient: ["#e3f2fd", "#bbdefb"], route: "HolyOrdenForm" },
+  { id: "s7", name: "Annointing", icon: "🕊️", color: "#ffeaa7", gradient: ["#fbf2e5", "#ffe0b2"], route: "SickCallForm" },
+  { id: "other", name: "More", icon: "✨", color: "#636e72", gradient: ["#f1f5f9", "#e2e8f0"], route: "OtherServices" },
 ];
 
-// ⬇️ BOTTOM NAVIGATION ITEMS
+// ⬇️ BOTTOM NAVIGATION ITEMS (SAME AS ORIGINAL)
 const bottomNavItems = [
   { id: "1", name: "Home", icon: "home-outline", activeIcon: "home", route: "Home" },
   { id: "2", name: "Services", icon: "grid-outline", activeIcon: "grid", route: "Dashboard", active: true },
@@ -75,6 +104,70 @@ const DashboardScreen = ({ navigation }) => {
   const [activeSacrament, setActiveSacrament] = useState(null);
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [isOtherServicesModalVisible, setOtherServicesModalVisible] = useState(false);
+  
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const cardsAnim = useRef(new Animated.Value(0)).current;
+  const buttonsAnim = useRef(new Animated.Value(0)).current;
+
+  // 🎬 ENTRANCE ANIMATIONS
+  useEffect(() => {
+    Animated.stagger(200, [
+      Animated.spring(headerAnim, {
+        toValue: 1,
+        tension: 60,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardsAnim, {
+        toValue: 1,
+        tension: 60,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.spring(buttonsAnim, {
+        toValue: 1,
+        tension: 60,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const headerStyle = {
+    transform: [
+      {
+        translateY: headerAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-100, 0],
+        }),
+      },
+    ],
+    opacity: headerAnim,
+  };
+
+  const cardsStyle = {
+    transform: [
+      {
+        translateY: cardsAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [50, 0],
+        }),
+      },
+    ],
+    opacity: cardsAnim,
+  };
+
+  const buttonsStyle = {
+    transform: [
+      {
+        translateY: buttonsAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [50, 0],
+        }),
+      },
+    ],
+    opacity: buttonsAnim,
+  };
 
   // 📝 HANDLERS
   const handleSacramentPress = (item) => {
@@ -99,65 +192,136 @@ const DashboardScreen = ({ navigation }) => {
   const handleNavPress = (navItem) => {
     setActiveNav(navItem.route);
     if (navItem.route !== activeNav) {
-        navigation.navigate(navItem.route);
+      navigation.navigate(navItem.route);
     }
   };
 
-  // 🖼️ ENHANCED SACRAMENT CARD COMPONENT
-  const SacramentCard = ({ item }) => {
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-    const isActive = activeSacrament === item.id;
-    const cardBackgroundColor = item.colors.main;
-    const cardTextColor = item.colors.dark;
-    const isOtherServices = item.id === "other";
+  // 🎴 RESPONSIVE SACRAMENT CARD COMPONENT
+  const SacramentCard3D = ({ item, index }) => {
+    const cardScale = useRef(new Animated.Value(1)).current;
 
-    const handlePressIn = () => Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
-    const handlePressOut = () => Animated.spring(scaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }).start();
+    const handlePressIn = () => {
+      Animated.spring(cardScale, {
+        toValue: 0.95,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      Animated.spring(cardScale, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const cardStyle = {
+      transform: [
+        { scale: cardScale },
+      ],
+    };
 
     return (
-      <Animated.View style={{ transform: [{ scale: scaleAnim }], width: (width - 60) / 2, marginHorizontal: 5, marginBottom: 15 }}>
+      <Animated.View style={[styles.sacramentCardWrapper, cardStyle]}>
         <TouchableOpacity
           style={[
             styles.sacramentCard,
             {
-              backgroundColor: cardBackgroundColor,
-              shadowColor: cardTextColor,
-              borderColor: cardTextColor + '30',
+              borderColor: activeSacrament === item.id ? item.color : BORDER_COLOR,
             },
-            isActive && styles.sacramentCardActive,
           ]}
           onPress={() => handleSacramentPress(item)}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           activeOpacity={0.9}
         >
-          <LinearGradient
-            colors={item.colors.gradient}
-            style={[
-              styles.sacramentIconContainer,
-              {
-                borderColor: cardTextColor + '80',
-                shadowColor: cardTextColor,
-              },
-            ]}
-          >
-            {isOtherServices ? (
-              <Ionicons name={otherservicesIcon} size={30} color={cardTextColor} />
-            ) : (
-              <Image source={item.image} style={styles.sacramentImage} />
-            )}
-          </LinearGradient>
-          <Text style={[styles.sacramentName, { color: cardTextColor }, isOtherServices && styles.otherServiceName]}>
-            {item.name}
-          </Text>
-          <Text style={styles.sacramentSubtext}>{item.shortName}</Text>
+          <View style={[styles.sacramentGradient, { backgroundColor: item.gradient[0] }]}>
+            <FloatingElement duration={1500 + index * 200}>
+              <Text style={styles.sacramentEmoji}>{item.icon}</Text>
+            </FloatingElement>
+            <Text style={[styles.sacramentName, { color: TEXT_PRIMARY }]} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <View style={[styles.cardGlow, { backgroundColor: item.color }]} />
+          </View>
         </TouchableOpacity>
       </Animated.View>
     );
   };
 
-  // 🚪 ENHANCED OTHER SERVICES MODAL
-  const OtherServicesModal = () => {
+  // 🚀 RESPONSIVE ACTION BUTTON
+  const PremiumActionButton = ({ icon, title, subtitle, onPress, gradient }) => {
+    const btnScale = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+      Animated.spring(btnScale, {
+        toValue: 0.97,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      Animated.spring(btnScale, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    return (
+      <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+        <TouchableOpacity
+          style={styles.premiumActionButton}
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={gradient}
+            style={styles.premiumButtonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <View style={styles.buttonIconContainer}>
+              <Ionicons name={icon} size={isSmallDevice ? 20 : 24} color="#fff" />
+            </View>
+            <View style={styles.buttonTextContainer}>
+              <Text style={styles.premiumButtonTitle}>{title}</Text>
+              <Text style={styles.premiumButtonSubtitle}>{subtitle}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={isSmallDevice ? 18 : 20} color="rgba(255,255,255,0.8)" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  // 🎪 RESPONSIVE MODAL
+  const OtherServicesModal3D = () => {
+    const modalScale = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+      Animated.spring(modalScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }).start();
+    }, []);
+
+    const modalStyle = {
+      transform: [
+        {
+          scale: modalScale.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.8, 1],
+          }),
+        },
+      ],
+      opacity: modalScale,
+    };
+
     const handleServiceSelect = (service) => {
       setOtherServicesModalVisible(false);
       switch (service) {
@@ -180,75 +344,65 @@ const DashboardScreen = ({ navigation }) => {
         name: "Mass Intention",
         icon: "book-outline",
         route: "MassIntention",
-        description: "Request for special masses (Pamisa)",
-        color: PRIMARY_COLOR
+        gradient: ["#667eea", "#764ba2"]
       },
       {
         name: "Blessing",
         icon: "sparkles-outline",
         route: "Blessing",
-        description: "Blessing of houses, vehicles, or items",
-        color: SECONDARY_COLOR
+        gradient: ["#f093fb", "#f5576c"]
       },
       {
         name: "Burial Service",
         icon: "heart-dislike-outline",
         route: "BurialService",
-        description: "Funeral masses and necessary services",
-        color: "#6b7280"
+        gradient: ["#4facfe", "#00f2fe"]
       },
     ];
 
     return (
-      <Modal animationType="slide" transparent visible={isOtherServicesModalVisible} onRequestClose={() => setOtherServicesModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+      <Modal animationType="fade" transparent visible={isOtherServicesModalVisible}>
+        <View style={styles.modalOverlay3D}>
+          <Animated.View style={[styles.modalContent3D, modalStyle]}>
             <LinearGradient
               colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
-              style={styles.modalHeader}
+              style={styles.modalHeader3D}
             >
-              <Text style={styles.modalTitle}>More Church Services</Text>
-              <Text style={styles.modalSubtitle}>Select an additional service to request</Text>
-              <TouchableOpacity onPress={() => setOtherServicesModalVisible(false)} style={styles.modalCloseButton}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
+              <FloatingElement>
+                <Ionicons name="sparkles" size={isSmallDevice ? 28 : 32} color={ACCENT_COLOR} />
+              </FloatingElement>
+              <Text style={styles.modalTitle3D}>Additional Services</Text>
+              <Text style={styles.modalSubtitle3D}>Choose from our special services</Text>
             </LinearGradient>
 
-            <View style={styles.modalButtonContainer}>
+            <View style={styles.modalButtons3D}>
               {serviceButtons.map((button, index) => (
                 <TouchableOpacity
                   key={index}
-                  style={styles.serviceButton}
+                  style={styles.serviceButton3D}
                   onPress={() => handleServiceSelect(button.route)}
                   activeOpacity={0.8}
                 >
                   <LinearGradient
-                    colors={['#f8fafc', '#f1f5f9']}
-                    style={styles.serviceIconContainer}
+                    colors={button.gradient}
+                    style={styles.serviceGradient3D}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                   >
-                    <Ionicons name={button.icon} size={28} color={button.color} />
+                    <Ionicons name={button.icon} size={isSmallDevice ? 24 : 28} color="#fff" />
+                    <Text style={styles.serviceButtonTitle3D}>{button.name}</Text>
                   </LinearGradient>
-                  <View style={styles.serviceTextContainer}>
-                    <Text style={styles.serviceButtonTitle}>{button.name}</Text>
-                    <Text style={styles.serviceButtonDescription}>{button.description}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
                 </TouchableOpacity>
               ))}
             </View>
 
             <TouchableOpacity
-              style={styles.closeButton}
+              style={styles.closeButton3D}
               onPress={() => setOtherServicesModalVisible(false)}
             >
-              <LinearGradient
-                colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
-                style={styles.gradientButton}
-              >
-                <Text style={styles.closeButtonText}>Close</Text>
-              </LinearGradient>
+              <Text style={styles.closeButtonText3D}>Close</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     );
@@ -258,169 +412,103 @@ const DashboardScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={PRIMARY_COLOR} />
       
-      {/* ENHANCED HEADER SECTION */}
-      <LinearGradient
-        colors={[PRIMARY_COLOR, PRIMARY_LIGHT, PRIMARY_DARK]}
-        style={styles.headerContainer}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerTopSection}>
-          <LinearGradient
-            colors={[SECONDARY_COLOR, SECONDARY_LIGHT]}
-            style={styles.logoContainer}
-          >
-            <Image source={churchLogo} style={styles.logo} />
-          </LinearGradient>
-          <View style={styles.parishInfo}>
-            <Text style={styles.parishName}>SAN JOSE MANGGAGAWA PARISH</Text>
-            <Text style={styles.parishLocation}>Diocese of Antipolo</Text>
-          </View>
-        </View>
-
-        <View style={styles.dashboardTitleContainer}>
-          <Text style={styles.dashboardTitle}>Services Dashboard</Text>
-          <Text style={styles.dashboardSubtitle}>Book services and manage your requests</Text>
-        </View>
-      </LinearGradient>
-
-      <View style={styles.contentContainer}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-          {/* SACRAMENTS SECTION */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Holy Sacraments</Text>
-              <Text style={styles.sectionSubtitle}>Initiate or complete your church sacraments</Text>
+      {/* 🌟 RESPONSIVE HEADER SECTION */}
+      <Animated.View style={[styles.headerContainer, headerStyle]}>
+        <LinearGradient
+          colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
+          style={styles.headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.headerTop}>
+            <FloatingElement>
+              <Image source={churchLogo} style={styles.logo3D} />
+            </FloatingElement>
+            <View style={styles.parishInfo}>
+              <Text style={styles.parishName3D} numberOfLines={1}>
+                SAN JOSE MANGGAGAWA PARISH
+              </Text>
+              <Text style={styles.parishLocation3D}>Diocese of Antipolo</Text>
             </View>
+          </View>
 
-            <FlatList
-              data={sacraments}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              scrollEnabled={false}
-              renderItem={({ item }) => <SacramentCard item={item} />}
-              columnWrapperStyle={styles.sacramentsRow}
+          <View style={styles.headerMain}>
+            <Text style={styles.dashboardTitle3D}>DASHBOARD</Text>
+            <Text style={styles.dashboardSubtitle3D}>Sacred moments await</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* 📱 MAIN CONTENT WITH RESPONSIVE DESIGN */}
+      <ScrollView 
+        style={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* 🎴 RESPONSIVE SACRAMENTS GRID */}
+        <Animated.View style={[styles.section, cardsStyle]}>
+          <Text style={styles.sectionTitle3D}>Holy Sacraments</Text>
+          <View style={styles.sacramentsGrid3D}>
+            {sacraments.map((item, index) => (
+              <SacramentCard3D key={item.id} item={item} index={index} />
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* ✨ RESPONSIVE ACTION BUTTONS */}
+        <Animated.View style={[styles.actionsSection, buttonsStyle]}>
+          <Text style={styles.sectionTitle3D}>Quick Actions</Text>
+          
+          <View style={styles.premiumActionsGrid}>
+            <PremiumActionButton
+              icon="calendar-outline"
+              title="Schedule History"
+              subtitle="View your bookings"
+              onPress={handleHistoryPress}
+              gradient={['#2563eb', '#1e40af']}
+            />
+            
+            <PremiumActionButton
+              icon="document-text-outline"
+              title="Request Certificate"
+              subtitle="Get official documents"
+              onPress={handleCertificatePress}
+              gradient={['#059669', '#047857']}
+            />
+            
+            <PremiumActionButton
+              icon="eye-outline"
+              title="View Certificates"
+              subtitle="Check request status"
+              onPress={handleViewCertificatePress}
+              gradient={['#7c3aed', '#6d28d9']}
+            />
+            
+            <PremiumActionButton
+              icon="people-outline"
+              title="Volunteer to Serve"
+              subtitle="Join ministries"
+              onPress={handleVolunteerPress}
+              gradient={['#f59e0b', '#d97706']}
+            />
+            
+            <PremiumActionButton
+              icon="people-circle-outline"
+              title="Volunteer History"
+              subtitle="Check volunteers"
+              onPress={handleViewVolunteersPress}
+              gradient={['#ef4444', '#ba1a1a']}
             />
           </View>
+        </Animated.View>
+        
+        <View style={{ height: isSmallDevice ? 20 : 30 }} />
+      </ScrollView>
 
-          {/* ENHANCED ACTION BUTTONS SECTION */}
-          <View style={styles.buttonsSection}>
-            <Text style={styles.actionSectionTitle}>Quick Actions</Text>
-            
-            {/* ✅ SCHEDULE HISTORY BUTTON */}
-            <View style={styles.singleButtonRow}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.historyButton]} 
-                onPress={handleHistoryPress} 
-                activeOpacity={0.9}
-              >
-                <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
-                  style={styles.gradientActionButton}
-                >
-                  <Ionicons name="calendar-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                  <View style={styles.buttonTextContainer}>
-                    <Text style={styles.actionButtonText}>View Schedule History</Text>
-                    <Text style={styles.actionButtonSubtext}>Check previous service bookings</Text>
-                  </View>
-                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+      <OtherServicesModal3D />
 
-            <View style={styles.buttonsRow}>
-              {/* Request Certificate Button */}
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.certificateButton]} 
-                onPress={handleCertificatePress} 
-                activeOpacity={0.9}
-              >
-                <LinearGradient
-                  colors={[PRIMARY_COLOR, PRIMARY_LIGHT]}
-                  style={styles.gradientActionButton}
-                >
-                  <Ionicons name="document-text-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                  <View style={styles.buttonTextContainer}>
-                    <Text style={styles.actionButtonText}>Request Certificate</Text>
-                    <Text style={styles.actionButtonSubtext}>Baptism, Marriage, etc.</Text>
-                  </View>
-                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* View Certificate Button */}
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.viewCertificateButton]} 
-                onPress={handleViewCertificatePress} 
-                activeOpacity={0.9}
-              >
-                <LinearGradient
-                  colors={['#1e40af', '#1e3a8a']}
-                  style={styles.gradientActionButton}
-                >
-                  <Ionicons name="eye-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                  <View style={styles.buttonTextContainer}>
-                    <Text style={styles.actionButtonText}>View Certificates</Text>
-                    <Text style={styles.actionButtonSubtext}>Check status of requests</Text>
-                  </View>
-                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.buttonsRow}>
-              {/* Volunteer Button */}
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.volunteerButton]} 
-                onPress={handleVolunteerPress} 
-                activeOpacity={0.9}
-              >
-                <LinearGradient
-                  colors={['#f59e0b', '#d97706']}
-                  style={styles.gradientActionButton}
-                >
-                  <Ionicons name="people-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                  <View style={styles.buttonTextContainer}>
-                    <Text style={styles.actionButtonText}>Volunteer to Serve</Text>
-                    <Text style={styles.actionButtonSubtext}>Join our church ministries</Text>
-                  </View>
-                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* View Volunteers Button */}
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.viewVolunteersButton]} 
-                onPress={handleViewVolunteersPress} 
-                activeOpacity={0.9}
-              >
-                <LinearGradient
-                  colors={['#7c3aed', '#6d28d9']}
-                  style={styles.gradientActionButton}
-                >
-                  <Ionicons name="list-outline" size={26} color={CARD_BACKGROUND} style={styles.buttonIcon} />
-                  <View style={styles.buttonTextContainer}>
-                    <Text style={styles.actionButtonText}>My Volunteers</Text>
-                    <Text style={styles.actionButtonSubtext}>View my applications</Text>
-                  </View>
-                  <Feather name="arrow-right" size={20} color={CARD_BACKGROUND} />
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          <View style={{ height: 30 }} /> 
-        </ScrollView>
-      </View>
-
-      <OtherServicesModal />
-
-      {/* ENHANCED BOTTOM NAVIGATION */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.98)']}
-        style={styles.bottomNav}
-      >
+      {/* 💎 RESPONSIVE BOTTOM NAVIGATION */}
+      <View style={styles.bottomNav}>
         {bottomNavItems.map((item) => (
           <TouchableOpacity
             key={item.id}
@@ -435,7 +523,7 @@ const DashboardScreen = ({ navigation }) => {
               >
                 <Ionicons
                   name={item.activeIcon}
-                  size={24}
+                  size={isSmallDevice ? 22 : 24}
                   color="#fff"
                 />
               </LinearGradient>
@@ -443,332 +531,287 @@ const DashboardScreen = ({ navigation }) => {
               <View style={styles.navIcon}>
                 <Ionicons
                   name={item.icon}
-                  size={24}
+                  size={isSmallDevice ? 22 : 24}
                   color={TEXT_SECONDARY}
                 />
               </View>
             )}
-            <Text style={[styles.navText, activeNav === item.route && styles.navTextActive]}>{item.name}</Text>
+            <Text style={[styles.navText, activeNav === item.route && styles.navTextActive]}>
+              {item.name}
+            </Text>
           </TouchableOpacity>
         ))}
-      </LinearGradient>
+      </View>
     </SafeAreaView>
   );
 };
 
 export default DashboardScreen;
 
-// --- PREMIUM STYLESHEET WITH GREEN THEME ---
+// 🎨 RESPONSIVE STYLES
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: BACKGROUND_COLOR, 
+    backgroundColor: BACKGROUND_COLOR,
   },
   
-  // 1. ENHANCED HEADER STYLES
+  // 🌟 RESPONSIVE HEADER STYLES
   headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: height > 800 ? 50 : 30,
-    paddingBottom: 30,
-    borderBottomLeftRadius: 35,
-    borderBottomRightRadius: 35,
-    elevation: 15,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 8 },
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
   },
   
-  headerTopSection: {
+  headerGradient: {
+    paddingHorizontal: isSmallDevice ? 16 : 24,
+    paddingTop: height > 800 ? 60 : (isSmallDevice ? 30 : 40),
+    paddingBottom: isSmallDevice ? 20 : 30,
+  },
+  
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: isSmallDevice ? 15 : 25,
   },
 
-  logoContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-
-  logo: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+  logo3D: {
+    width: isSmallDevice ? 60 : 70,
+    height: isSmallDevice ? 60 : 70,
+    borderRadius: isSmallDevice ? 20 : 30,
+    marginRight: isSmallDevice ? 12 : 16,
+    borderWidth: 2,
+    borderColor: ACCENT_COLOR,
+    backgroundColor: '#ffffff',
   },
 
   parishInfo: {
     flex: 1,
   },
 
-  parishName: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '900',
+  parishName3D: {
+    color: '#ffffff',
+    fontSize: isSmallDevice ? 14 : 18,
+    fontWeight: '800',
     letterSpacing: 0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
   },
 
-  parishLocation: {
-    fontSize: 13,
-    color: SECONDARY_COLOR,
+  parishLocation3D: {
+    fontSize: isSmallDevice ? 11 : 13,
+    color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '600',
     marginTop: 2,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: 0.3,
   },
 
-  dashboardTitleContainer: {
-    paddingTop: 10,
+  headerMain: {
+    paddingTop: 5,
   },
 
-  dashboardTitle: {
-    fontSize: 28,
+  dashboardTitle3D: {
+    fontSize: isSmallDevice ? 26 : 32,
     fontWeight: '900',
-    color: '#fff',
+    color: '#ffffff',
     marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 4,
+    letterSpacing: 1,
   },
 
-  dashboardSubtitle: {
-    fontSize: 15,
+  dashboardSubtitle3D: {
+    fontSize: isSmallDevice ? 14 : 16,
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: 0.3,
   },
   
-  // 2. CONTENT STYLES
+  // 📱 CONTENT STYLES
   contentContainer: {
     flex: 1,
+    backgroundColor: BACKGROUND_COLOR,
   },
   
   scrollContent: {
-    padding: 20,
-    paddingTop: 25,
+    padding: isSmallDevice ? 16 : 20,
     paddingBottom: 100,
   },
 
   section: {
-    marginBottom: 30,
+    marginBottom: isSmallDevice ? 25 : 40,
   },
   
-  sectionHeader: {
-    marginBottom: 20,
-  },
-
-  sectionTitle: {
-    fontSize: 22,
+  sectionTitle3D: {
+    fontSize: isSmallDevice ? 20 : 24,
     fontWeight: '800',
     color: TEXT_PRIMARY,
-    marginBottom: 4,
-    letterSpacing: -0.5,
+    marginBottom: isSmallDevice ? 15 : 20,
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
 
-  sectionSubtitle: {
-    fontSize: 14,
-    color: TEXT_SECONDARY,
-    fontWeight: '500',
-  },
-
-  sacramentsRow: {
+  // 🎴 RESPONSIVE SACRAMENT CARD STYLES
+  sacramentsGrid3D: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginHorizontal: isSmallDevice ? -4 : -6,
   },
 
-  // 3. ENHANCED SACRAMENT CARD STYLES
+  sacramentCardWrapper: {
+    width: cardWidth,
+    marginBottom: isSmallDevice ? 12 : 16,
+    paddingHorizontal: isSmallDevice ? 4 : 6,
+  },
+
   sacramentCard: {
-    flex: 1, 
-    alignItems: 'center',
-    padding: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    elevation: 8,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-  },
-
-  sacramentIconContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 3,
-    elevation: 6,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
+    borderWidth: 2,
+    backgroundColor: CARD_BACKGROUND,
   },
 
-  sacramentImage: {
-    width: '150%',
-    height: '150%',
-    resizeMode: 'contain',
+  sacramentGradient: {
+    padding: isSmallDevice ? 12 : 16,
+    alignItems: 'center',
+    borderRadius: 14,
+    height: cardHeight,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+
+  sacramentEmoji: {
+    fontSize: isSmallDevice ? 28 : 32,
+    marginBottom: isSmallDevice ? 6 : 8,
   },
 
   sacramentName: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: isSmallDevice ? 10 : 12,
+    fontWeight: '700',
     textAlign: 'center',
-    marginTop: 5,
-  },
-  
-  otherServiceName: {
-    fontSize: 16, 
-  },
-  
-  sacramentSubtext: {
-    fontSize: 11,
-    color: TEXT_SECONDARY,
-    textAlign: 'center',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  
-  // 4. PREMIUM ACTION BUTTON STYLES
-  buttonsSection: {
-    marginBottom: 30,
-  },
-  
-  actionSectionTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: TEXT_PRIMARY,
-    marginBottom: 15,
-    letterSpacing: -0.5,
-  },
-  
-  buttonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    marginHorizontal: -5,
+    letterSpacing: 0.3,
+    lineHeight: isSmallDevice ? 12 : 14,
   },
 
-  singleButtonRow: {
-    marginBottom: 12,
-    marginHorizontal: 0,
+  cardGlow: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    opacity: 0.3,
   },
 
-  actionButton: {
-    flex: 1,
-    borderRadius: 25,
-    elevation: 5,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    marginHorizontal: 5,
+  // ✨ RESPONSIVE ACTION BUTTONS
+  actionsSection: {
+    marginBottom: isSmallDevice ? 20 : 30,
+  },
+
+  premiumActionsGrid: {
+    gap: isSmallDevice ? 8 : 12,
+  },
+
+  premiumActionButton: {
+    borderRadius: isSmallDevice ? 16 : 20,
     overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
 
-  gradientActionButton: {
+  premiumButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
-    borderRadius: 18,
+    padding: isSmallDevice ? 16 : 20,
+    borderRadius: isSmallDevice ? 16 : 20,
   },
 
-  buttonIcon: {
-    marginRight: 12,
+  buttonIconContainer: {
+    width: isSmallDevice ? 40 : 44,
+    height: isSmallDevice ? 40 : 44,
+    borderRadius: isSmallDevice ? 10 : 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: isSmallDevice ? 12 : 15,
   },
-
-  // 🎨 ENHANCED COLOR COMBINATIONS
-  historyButton: {
-    marginHorizontal: 0,
-  },
-
-  volunteerButton: {},
-  certificateButton: {},
-  viewCertificateButton: {},
-  viewVolunteersButton: {},
 
   buttonTextContainer: {
     flex: 1,
   },
 
-  actionButtonText: {
-    fontSize: 16,
+  premiumButtonTitle: {
+    fontSize: isSmallDevice ? 14 : 16,
     fontWeight: '700',
-    color: CARD_BACKGROUND,
-    marginBottom: 3,
-    letterSpacing: -0.3,
+    color: '#ffffff',
+    marginBottom: 2,
+    letterSpacing: 0.3,
   },
 
-  actionButtonSubtext: {
-    fontSize: 12,
+  premiumButtonSubtitle: {
+    fontSize: isSmallDevice ? 10 : 12,
     color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 14,
     fontWeight: '500',
   },
 
-  // 5. PREMIUM BOTTOM NAV STYLES
+  // 💎 RESPONSIVE BOTTOM NAVIGATION
   bottomNav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 12,
+    paddingVertical: isSmallDevice ? 8 : 12,
+    backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-    elevation: 20,
+    borderTopColor: BORDER_COLOR,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -5 },
-    shadowOpacity: 0.15,
-    shadowRadius: 15,
-    paddingBottom: height > 800 ? 25 : 12,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    paddingBottom: height > 800 ? 20 : (isSmallDevice ? 8 : 12),
   },
 
   navItem: {
     alignItems: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: isSmallDevice ? 3 : 5,
     paddingVertical: 2,
-    borderRadius: 16,
+    borderRadius: 12,
     flex: 1,
   },
 
-  navItemActive: {
-    // Background handled by gradient icon
-  },
-
   navIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: isSmallDevice ? 45 : 50,
+    height: isSmallDevice ? 45 : 50,
+    borderRadius: isSmallDevice ? 22 : 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
 
   activeNavIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: isSmallDevice ? 45 : 50,
+    height: isSmallDevice ? 45 : 50,
+    borderRadius: isSmallDevice ? 22 : 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
     shadowColor: PRIMARY_COLOR,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 6,
   },
 
   navText: {
-    fontSize: 11,
+    fontSize: isSmallDevice ? 10 : 11,
     marginTop: 2,
     color: TEXT_SECONDARY,
     fontWeight: '600',
@@ -779,135 +822,97 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   
-  // 6. PREMIUM MODAL STYLES
-  modalOverlay: {
+  // 🚀 RESPONSIVE MODAL STYLES
+  modalOverlay3D: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: isSmallDevice ? 16 : 20,
   },
   
-  modalContent: {
+  modalContent3D: {
     width: '100%',
-    backgroundColor: CARD_BACKGROUND,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    elevation: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: isSmallDevice ? 20 : 30,
+    overflow: 'hidden',
+    maxWidth: 400,
+    elevation: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
-    maxHeight: height * 0.85,
   },
   
-  modalHeader: {
-    padding: 30,
-    paddingBottom: 20,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    position: 'relative',
+  modalHeader3D: {
+    padding: isSmallDevice ? 20 : 30,
+    alignItems: 'center',
   },
   
-  modalTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 5,
+  modalTitle3D: {
+    fontSize: isSmallDevice ? 20 : 24,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginTop: isSmallDevice ? 12 : 16,
+    marginBottom: isSmallDevice ? 4 : 8,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   
-  modalSubtitle: {
-    fontSize: 15,
+  modalSubtitle3D: {
+    fontSize: isSmallDevice ? 12 : 14,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     fontWeight: '500',
+    letterSpacing: 0.3,
   },
   
-  modalCloseButton: {
-    position: 'absolute',
-    top: 25,
-    right: 25,
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  modalButtons3D: {
+    padding: isSmallDevice ? 16 : 24,
+    gap: isSmallDevice ? 8 : 12,
   },
   
-  modalButtonContainer: {
-    padding: 25,
-    paddingBottom: 20,
+  serviceButton3D: {
+    borderRadius: isSmallDevice ? 12 : 16,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
   
-  serviceButton: {
+  serviceGradient3D: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
-    borderRadius: 16,
-    marginBottom: 12,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: isSmallDevice ? 16 : 20,
+    borderRadius: isSmallDevice ? 12 : 16,
   },
   
-  serviceIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  
-  serviceTextContainer: {
+  serviceButtonTitle3D: {
+    fontSize: isSmallDevice ? 14 : 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: isSmallDevice ? 10 : 12,
     flex: 1,
+    letterSpacing: 0.3,
   },
   
-  serviceButtonTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: TEXT_PRIMARY,
-    marginBottom: 3,
-    letterSpacing: -0.3,
-  },
-  
-  serviceButtonDescription: {
-    fontSize: 12,
-    color: TEXT_SECONDARY,
-    lineHeight: 16,
-    fontWeight: '500',
-  },
-  
-  closeButton: {
-    margin: 25,
+  closeButton3D: {
+    margin: isSmallDevice ? 16 : 24,
     marginTop: 0,
-    borderRadius: 18,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: PRIMARY_COLOR,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  
-  gradientButton: {
-    paddingVertical: 16,
+    padding: isSmallDevice ? 14 : 16,
+    borderRadius: isSmallDevice ? 12 : 16,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER_COLOR,
   },
   
-  closeButtonText: {
-    fontSize: 16,
-    color: CARD_BACKGROUND,
+  closeButtonText3D: {
+    fontSize: isSmallDevice ? 14 : 16,
+    color: TEXT_PRIMARY,
     fontWeight: '700',
-    letterSpacing: 0.5,
-  }
+    letterSpacing: 0.3,
+  },
 });
