@@ -31,7 +31,7 @@
         return `@user_notifications_${safeEmail}`;
     };
 
-    const API_BASE_URL = "http://192.168.1.42:5000";
+    const API_BASE_URL = "http://mobileonlysjmp.onrender.com";
 
     const ALL_ENDPOINTS = [
         'baptismrequests',

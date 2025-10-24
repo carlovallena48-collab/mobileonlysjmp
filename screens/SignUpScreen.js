@@ -123,7 +123,7 @@ export default function SignUpScreen({ navigation }) {
         setLoading(true);
         try {
             const response = await axios.post(
-                'http://192.168.1.42:5000/api/signup',
+                'http://mobileonlysjmp.onrender.com/api/signup',
                 { fullName, email, password, address, contact, role: "Member" }
             );
 
@@ -163,7 +163,7 @@ export default function SignUpScreen({ navigation }) {
 
         setLoading(true);
         try {
-            const response = await axios.post('http://192.168.1.42:5000/api/resend-verification', {
+            const response = await axios.post('http://mobileonlysjmp.onrender.com/api/resend-verification', {
                 email: email.trim().toLowerCase()
             });
 

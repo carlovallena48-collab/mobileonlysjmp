@@ -51,7 +51,7 @@ export default function ResetPasswordScreen() {
         setLoading(true);
         try {
             console.log('📤 Resetting password...');
-            const response = await axios.post(`http://192.168.1.42:5000/api/reset-password/${token}`, {
+            const response = await axios.post(`http://mobileonlysjmp.onrender.com/api/reset-password/${token}`, {
                 newPassword: newPassword,
             });
 

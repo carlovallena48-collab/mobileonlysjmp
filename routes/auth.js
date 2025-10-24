@@ -2,7 +2,6 @@ const express = require("express");
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { OAuth2Client } = require('google-auth-library');
 const { getDB } = require("../config/database");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../utils/email");
 
@@ -329,72 +328,6 @@ router.post("/reset-password/:token", async (req, res) => {
   } catch (err) {
     console.error("Reset password error:", err);
     res.status(500).json({ message: "Something went wrong." });
-  }
-});
-
-// GOOGLE AUTH
-router.post('/auth/google/expo', async (req, res) => {
-  try {
-    const { accessToken } = req.body;
-    const db = getDB();
-    
-    if (!accessToken) {
-      return res.status(400).json({ success: false, message: 'Access token required' });
-    }
-
-    const client = new OAuth2Client('630251895833-jgbkmqav3iq67fhf7gg2pl3gmhap62kk.apps.googleusercontent.com');
-    const ticket = await client.verifyIdToken({
-      idToken: accessToken,
-      audience: '630251895833-jgbkmqav3iq67fhf7gg2pl3gmhap62kk.apps.googleusercontent.com'
-    });
-    
-    const payload = ticket.getPayload();
-    
-    let user = await db.collection("users").findOne({ email: payload.email });
-    
-    if (!user) {
-      const newUser = {
-        googleId: payload.sub,
-        fullName: payload.name,
-        email: payload.email,
-        profileImage: payload.picture,
-        role: "Member",
-        isVerified: true,
-        createdAt: new Date(),
-        address: null,
-        contact: null
-      };
-      
-      const result = await db.collection("users").insertOne(newUser);
-      user = { ...newUser, _id: result.insertedId };
-    }
-    
-    const { password, ...userWithoutPassword } = user;
-    
-    // Generate JWT token for Google auth user
-    const token = jwt.sign(
-      { 
-        userId: user._id.toString(),
-        email: user.email,
-        role: user.role 
-      },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
-    
-    res.json({ 
-      success: true, 
-      user: userWithoutPassword,
-      token: token,
-      message: "Google login successful" 
-    });
-    
-  } catch (error) {
-    console.error('❌ Google auth error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Google authentication failed: ' + error.message 
-    });
   }
 });
 

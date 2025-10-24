@@ -2,7 +2,7 @@
   "expo": {
     "name": "SJMP Parish App",
     "slug": "sjmp-parish-app",
-    "scheme": "sjmpapp", 
+    "scheme": "sjmpapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/LOGO.png",
@@ -15,22 +15,41 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.sjmpparishapp"
+      "bundleIdentifier": "com.carlovallena.sjmpparishapp",
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          }
+        ]
+      }
     },
     "android": {
+      "package": "com.carlovallena.sjmpparishapp",
+      "compileSdkVersion": 33,
+      "targetSdkVersion": 33,
+      "buildToolsVersion": "33.0.2",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/LOGO.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.yourcompany.sjmpparishapp"
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "favicon": "./assets/LOGO.png"
     },
     "plugins": [
-      "expo-web-browser",
-      "expo-facebook"
-    ]
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bc6c1e71-7fa6-44ba-a1ae-025231691329"
+      }
+    }
   }
 }

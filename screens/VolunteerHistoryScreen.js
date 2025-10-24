@@ -25,7 +25,7 @@ const BACKGROUND_COLOR = "#f0fdfa";
 const CARD_BACKGROUND = "#ffffff";
 
 // Your API base URL
-const API_BASE_URL = "http://192.168.1.42:5000";
+const API_BASE_URL = "http://mobileonlysjmp.onrender.com";
 
 const SERVER_ICONS = {
   "Mother Butler Guild": "flower-outline",
