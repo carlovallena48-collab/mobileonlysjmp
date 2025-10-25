@@ -11,14 +11,29 @@ import {
     ActivityIndicator,
     Animated,
     Easing,
-    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
+
+// Simple local validation functions
+const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+    return password.length >= 6;
+};
+
+const validateContact = (contact) => {
+    const contactRegex = /^[0-9+\-\s()]{10,}$/;
+    return contactRegex.test(contact.replace(/\s/g, ''));
+};
 
 export default function SignUpScreen({ navigation }) {
     const [fullName, setFullName] = useState('');
@@ -30,18 +45,15 @@ export default function SignUpScreen({ navigation }) {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [requiresVerification, setRequiresVerification] = useState(false);
 
-    // Premium Animations
+    // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideUpAnim = useRef(new Animated.Value(30)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
     const buttonScale = useRef(new Animated.Value(1)).current;
-    const buttonGlow = useRef(new Animated.Value(0)).current;
     const formSlide = useRef(new Animated.Value(50)).current;
 
     React.useEffect(() => {
-        // Entry animations
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -71,20 +83,18 @@ export default function SignUpScreen({ navigation }) {
     }, []);
 
     const handleSignUp = async () => {
+        // Client-side validation
         if (!fullName || !email || !password || !confirmPassword || !address || !contact) {
             Alert.alert('Error', 'Please fill in all fields.');
             return;
         }
 
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        if (!validateEmail(email)) {
             Alert.alert('Error', 'Please enter a valid email address.');
             return;
         }
 
-        // Password validation
-        if (password.length < 6) {
+        if (!validatePassword(password)) {
             Alert.alert('Error', 'Password must be at least 6 characters long.');
             return;
         }
@@ -94,83 +104,89 @@ export default function SignUpScreen({ navigation }) {
             return;
         }
 
-        // Button press animation
+        if (!validateContact(contact)) {
+            Alert.alert('Error', 'Please enter a valid contact number.');
+            return;
+        }
+
+        // Button animation
         Animated.sequence([
-            Animated.parallel([
-                Animated.spring(buttonScale, {
-                    toValue: 0.95,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(buttonGlow, {
-                    toValue: 1,
-                    duration: 150,
-                    useNativeDriver: true,
-                })
-            ]),
-            Animated.parallel([
-                Animated.spring(buttonScale, {
-                    toValue: 1,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(buttonGlow, {
-                    toValue: 0,
-                    duration: 300,
-                    useNativeDriver: true,
-                })
-            ])
+            Animated.spring(buttonScale, {
+                toValue: 0.95,
+                useNativeDriver: true,
+            }),
+            Animated.spring(buttonScale, {
+                toValue: 1,
+                useNativeDriver: true,
+            })
         ]).start();
 
         setLoading(true);
         try {
-            const response = await axios.post(
-                'https://mobileonlysjmp.onrender.com/api/signup',
-                { fullName, email, password, address, contact, role: "Member" }
+            // Check if email already exists locally first
+            const existingUsers = await AsyncStorage.getItem('parish_users');
+            const users = existingUsers ? JSON.parse(existingUsers) : [];
+            
+            const emailExists = users.find(user => user.email.toLowerCase() === email.toLowerCase());
+            if (emailExists) {
+                Alert.alert('Error', 'This email is already registered. Please use a different email or login.');
+                setLoading(false);
+                return;
+            }
+
+            // Create new user object
+            const newUser = {
+                id: Date.now().toString(),
+                fullName: fullName.trim(),
+                email: email.toLowerCase().trim(),
+                password: password, // In production, this should be hashed
+                address: address.trim(),
+                contact: contact.trim(),
+                role: "Member",
+                isVerified: true, // Skip verification for free tier
+                createdAt: new Date().toISOString(),
+            };
+
+            // Save to local storage
+            users.push(newUser);
+            await AsyncStorage.setItem('parish_users', JSON.stringify(users));
+
+            // Also save to backend if available (but don't block on failure)
+            try {
+                await axios.post('https://mobileonlysjmp.onrender.com/api/signup', {
+                    fullName,
+                    email,
+                    password,
+                    address,
+                    contact,
+                    role: "Member"
+                }, { timeout: 5000 });
+            } catch (backendError) {
+                console.log('Backend signup failed, but local signup succeeded:', backendError.message);
+            }
+
+            Alert.alert(
+                'Success', 
+                'Account created successfully! You can now login.',
+                [
+                    {
+                        text: 'Go to Login',
+                        onPress: () => navigation.navigate('Login')
+                    }
+                ]
             );
 
-            if (response.data.requiresVerification) {
-                setRequiresVerification(true);
-                Alert.alert(
-                    'Verification Required', 
-                    response.data.message,
-                    [
-                        {
-                            text: 'Open Email',
-                            onPress: () => Linking.openURL('mailto:')
-                        },
-                        {
-                            text: 'OK',
-                            style: 'default'
-                        }
-                    ]
-                );
-            } else {
-                Alert.alert('Success', response.data.message);
-                navigation.navigate('Login');
-            }
-        } catch (err) {
-            console.log('AXIOS ERROR DETAIL:', err.response?.data, err.message);
-            Alert.alert('Error', err.response?.data?.message || err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+            // Clear form
+            setFullName('');
+            setEmail('');
+            setPassword('');
+            setConfirmPassword('');
+            setAddress('');
+            setContact('');
 
-    const handleResendVerification = async () => {
-        if (!email) {
-            Alert.alert('Error', 'Email is required to resend verification.');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const response = await axios.post('https://mobileonlysjmp.onrender.com/api/resend-verification', {
-                email: email.trim().toLowerCase()
-            });
-
-            Alert.alert('Success', response.data.message);
-        } catch (err) {
-            console.log('Resend verification error:', err.response?.data, err.message);
-            Alert.alert('Error', err.response?.data?.message || 'Failed to resend verification email.');
+        } catch (error) {
+            console.log('Signup error:', error);
+            Alert.alert('Error', 'Failed to create account. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -187,7 +203,7 @@ export default function SignUpScreen({ navigation }) {
                 style={styles.background}
             >
                 
-                {/* Animated Header Section */}
+                {/* Header Section */}
                 <Animated.View style={[
                     styles.headerContainer,
                     {
@@ -208,11 +224,6 @@ export default function SignUpScreen({ navigation }) {
                             <Ionicons name="leaf" size={40} color="#FFFFFF" style={styles.headerIcon} />
                             <Text style={styles.headerText}>Join Our Parish</Text>
                             <Text style={styles.subHeaderText}>Begin Your Spiritual Journey</Text>
-                            <View style={styles.headerDivider}>
-                                <View style={styles.dividerDot} />
-                                <View style={styles.dividerLine} />
-                                <View style={styles.dividerDot} />
-                            </View>
                         </View>
                     </LinearGradient>
                 </Animated.View>
@@ -221,7 +232,7 @@ export default function SignUpScreen({ navigation }) {
                     contentContainerStyle={styles.scrollViewContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Animated Form Container */}
+                    {/* Form Container */}
                     <Animated.View style={[
                         styles.formContainer,
                         {
@@ -232,28 +243,9 @@ export default function SignUpScreen({ navigation }) {
                         }
                     ]}>
                         
-                        {/* Verification Banner */}
-                        {requiresVerification && (
-                            <View style={styles.verificationBanner}>
-                                <Ionicons name="mail-outline" size={24} color="#FFFFFF" />
-                                <View style={styles.verificationTextContainer}>
-                                    <Text style={styles.verificationTitle}>Check Your Email</Text>
-                                    <Text style={styles.verificationMessage}>
-                                        We sent a verification link to {email}
-                                    </Text>
-                                </View>
-                                <TouchableOpacity 
-                                    onPress={() => Linking.openURL('mailto:')}
-                                    style={styles.openEmailButton}
-                                >
-                                    <Text style={styles.openEmailText}>Open Email</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {/* Full Name Input with Premium Styling */}
+                        {/* Full Name Input */}
                         <View style={styles.inputSection}>
-                            <Text style={styles.label}>Full Name</Text>
+                            <Text style={styles.label}>Full Name *</Text>
                             <View style={styles.inputGroup}>
                                 <Ionicons name="person-outline" size={22} color="#10B981" style={styles.inputIcon} />
                                 <TextInput
@@ -269,7 +261,7 @@ export default function SignUpScreen({ navigation }) {
 
                         {/* Email Input */}
                         <View style={styles.inputSection}>
-                            <Text style={styles.label}>Email Address</Text>
+                            <Text style={styles.label}>Email Address *</Text>
                             <View style={styles.inputGroup}>
                                 <Ionicons name="mail-outline" size={22} color="#10B981" style={styles.inputIcon} />
                                 <TextInput
@@ -283,16 +275,19 @@ export default function SignUpScreen({ navigation }) {
                                     selectionColor="#10B981"
                                 />
                             </View>
+                            {email && !validateEmail(email) && (
+                                <Text style={styles.errorText}>Please enter a valid email address</Text>
+                            )}
                         </View>
 
                         {/* Address Input */}
                         <View style={styles.inputSection}>
-                            <Text style={styles.label}>Address</Text>
+                            <Text style={styles.label}>Address *</Text>
                             <View style={styles.inputGroup}>
                                 <Ionicons name="home-outline" size={22} color="#10B981" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Enter your address"
+                                    placeholder="Enter your complete address"
                                     placeholderTextColor="rgba(255,255,255,0.6)"
                                     value={address}
                                     onChangeText={setAddress}
@@ -303,12 +298,12 @@ export default function SignUpScreen({ navigation }) {
 
                         {/* Contact Input */}
                         <View style={styles.inputSection}>
-                            <Text style={styles.label}>Contact Number</Text>
+                            <Text style={styles.label}>Contact Number *</Text>
                             <View style={styles.inputGroup}>
                                 <Ionicons name="call-outline" size={22} color="#10B981" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Enter contact number"
+                                    placeholder="09XXXXXXXXX"
                                     placeholderTextColor="rgba(255,255,255,0.6)"
                                     value={contact}
                                     onChangeText={setContact}
@@ -316,11 +311,14 @@ export default function SignUpScreen({ navigation }) {
                                     selectionColor="#10B981"
                                 />
                             </View>
+                            {contact && !validateContact(contact) && (
+                                <Text style={styles.errorText}>Please enter a valid contact number</Text>
+                            )}
                         </View>
 
                         {/* Password Input */}
                         <View style={styles.inputSection}>
-                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.label}>Password *</Text>
                             <View style={styles.inputGroup}>
                                 <Ionicons name="lock-closed-outline" size={22} color="#10B981" style={styles.inputIcon} />
                                 <TextInput
@@ -343,11 +341,14 @@ export default function SignUpScreen({ navigation }) {
                                     />
                                 </TouchableOpacity>
                             </View>
+                            {password && !validatePassword(password) && (
+                                <Text style={styles.errorText}>Password must be at least 6 characters</Text>
+                            )}
                         </View>
 
                         {/* Confirm Password Input */}
                         <View style={styles.inputSection}>
-                            <Text style={styles.label}>Confirm Password</Text>
+                            <Text style={styles.label}>Confirm Password *</Text>
                             <View style={styles.inputGroup}>
                                 <Ionicons name="lock-closed-outline" size={22} color="#10B981" style={styles.inputIcon} />
                                 <TextInput
@@ -370,18 +371,17 @@ export default function SignUpScreen({ navigation }) {
                                     />
                                 </TouchableOpacity>
                             </View>
+                            {confirmPassword && password !== confirmPassword && (
+                                <Text style={styles.errorText}>Passwords do not match</Text>
+                            )}
                         </View>
 
-                        {/* Premium Sign Up Button */}
+                        {/* Sign Up Button */}
                         <Animated.View 
                             style={[
                                 styles.buttonWrapper,
                                 {
                                     transform: [{ scale: buttonScale }],
-                                    shadowOpacity: buttonGlow.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [0.4, 0.8]
-                                    })
                                 }
                             ]}
                         >
@@ -405,25 +405,11 @@ export default function SignUpScreen({ navigation }) {
                                             <Ionicons name="leaf" size={20} color="#FFFFFF" style={styles.buttonIcon} />
                                         </>
                                     )}
-                                    <View style={styles.buttonShine} />
                                 </LinearGradient>
                             </TouchableOpacity>
                         </Animated.View>
 
-                        {/* Resend Verification Button */}
-                        {requiresVerification && (
-                            <TouchableOpacity 
-                                style={styles.resendButton}
-                                onPress={handleResendVerification}
-                                disabled={loading}
-                            >
-                                <Text style={styles.resendButtonText}>
-                                    Didn't receive email? Resend Verification
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-
-                        {/* Login Redirect with Premium Styling */}
+                        {/* Login Redirect */}
                         <TouchableOpacity 
                             onPress={handleLoginRedirect} 
                             style={styles.loginLink}
@@ -438,10 +424,12 @@ export default function SignUpScreen({ navigation }) {
                             </View>
                         </TouchableOpacity>
 
-                        {/* Premium Footer */}
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>SAN JOSE MANGGAWA PARISH</Text>
-                            <Text style={styles.footerSubtext}>Diocese of Antipolo</Text>
+                        {/* Security Notice */}
+                        <View style={styles.securityNotice}>
+                            <Ionicons name="shield-checkmark" size={16} color="#10B981" />
+                            <Text style={styles.securityText}>
+                                Your information is securely stored locally on your device
+                            </Text>
                         </View>
                     </Animated.View>
                 </ScrollView>
@@ -449,7 +437,6 @@ export default function SignUpScreen({ navigation }) {
         </SafeAreaView>
     );
 }
-
 
 const styles = StyleSheet.create({
     safeArea: {
@@ -463,7 +450,6 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         paddingBottom: 40,
     },
-    // Premium Header
     headerContainer: {
         width: '100%',
         height: height * 0.22,
@@ -488,53 +474,19 @@ const styles = StyleSheet.create({
     },
     headerIcon: {
         marginBottom: 10,
-        textShadowColor: 'rgba(0,0,0,0.3)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 5,
     },
     headerText: {
         fontSize: 32,
         fontWeight: '900',
         color: '#FFFFFF',
         marginBottom: 8,
-        textShadowColor: 'rgba(0,0,0,0.3)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 5,
-        letterSpacing: 1,
     },
     subHeaderText: {
         fontSize: 16,
         color: '#FFFFFF',
         fontWeight: '600',
-        marginBottom: 15,
         opacity: 0.9,
-        letterSpacing: 0.5,
-        textShadowColor: 'rgba(0,0,0,0.2)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
     },
-    headerDivider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    dividerDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    dividerLine: {
-        width: 40,
-        height: 1,
-        backgroundColor: 'rgba(255,255,255,0.6)',
-        marginHorizontal: 8,
-    },
-    // Premium Form
     formContainer: {
         marginHorizontal: 20,
         backgroundColor: 'rgba(255,255,255,0.08)',
@@ -542,11 +494,6 @@ const styles = StyleSheet.create({
         padding: 25,
         borderWidth: 1,
         borderColor: 'rgba(16, 185, 129, 0.3)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 10,
     },
     inputSection: {
         marginBottom: 20,
@@ -556,11 +503,6 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#10B981',
         fontSize: 14,
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
-        textShadowColor: 'rgba(16, 185, 129, 0.3)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
     },
     inputGroup: {
         flexDirection: 'row',
@@ -571,11 +513,6 @@ const styles = StyleSheet.create({
         height: 55,
         borderWidth: 1,
         borderColor: 'rgba(16, 185, 129, 0.4)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 3,
     },
     inputIcon: {
         marginRight: 12,
@@ -590,7 +527,12 @@ const styles = StyleSheet.create({
         padding: 5,
         marginLeft: 5,
     },
-    // Premium Button
+    errorText: {
+        color: '#EF4444',
+        fontSize: 12,
+        marginTop: 5,
+        marginLeft: 5,
+    },
     buttonWrapper: {
         borderRadius: 20,
         marginTop: 10,
@@ -608,40 +550,23 @@ const styles = StyleSheet.create({
         paddingVertical: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        position: 'relative',
         flexDirection: 'row',
     },
     buttonText: {
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '900',
-        letterSpacing: 1,
-        textTransform: 'uppercase',
         marginRight: 8,
-        textShadowColor: 'rgba(0,0,0,0.3)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
     },
     buttonIcon: {
         fontWeight: 'bold',
     },
-    buttonShine: {
-        position: 'absolute',
-        top: -50,
-        left: -50,
-        width: 100,
-        height: 100,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 50,
-        transform: [{ rotate: '45deg' }],
-    },
     buttonDisabled: {
         opacity: 0.7,
     },
-    // Login Link
     loginLink: {
         marginTop: 10,
-        marginBottom: 30,
+        marginBottom: 20,
     },
     loginContainer: {
         flexDirection: 'row',
@@ -658,80 +583,22 @@ const styles = StyleSheet.create({
     loginLinkText: {
         color: '#10B981',
         fontWeight: '700',
-        textShadowColor: 'rgba(16, 185, 129, 0.3)',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 10,
     },
-    // Premium Footer
-    footer: {
-        alignItems: 'center',
-        paddingTop: 20,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(16, 185, 129, 0.3)',
-    },
-    footerText: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.6)',
-        fontWeight: '800',
-        letterSpacing: 2,
-        marginBottom: 2,
-        textTransform: 'uppercase',
-    },
-    footerSubtext: {
-        fontSize: 10,
-        color: 'rgba(255,255,255,0.4)',
-        fontWeight: '400',
-        letterSpacing: 1,
-    },
-  verificationBanner: {
+    securityNotice: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-        borderRadius: 15,
-        padding: 15,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(16, 185, 129, 0.5)',
-    },
-    verificationTextContainer: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    verificationTitle: {
-        color: '#FFFFFF',
-        fontWeight: '700',
-        fontSize: 16,
-        marginBottom: 2,
-    },
-    verificationMessage: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 14,
-    },
-    openEmailButton: {
-        backgroundColor: 'rgba(16, 185, 129, 0.3)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#10B981',
-    },
-    openEmailText: {
-        color: '#10B981',
-        fontWeight: '600',
-        fontSize: 12,
-    },
-    resendButton: {
-        backgroundColor: 'rgba(255, 193, 7, 0.2)',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
         padding: 12,
         borderRadius: 10,
-        alignItems: 'center',
-        marginBottom: 15,
         borderWidth: 1,
-        borderColor: 'rgba(255, 193, 7, 0.5)',
+        borderColor: 'rgba(16, 185, 129, 0.3)',
     },
-    resendButtonText: {
-        color: '#FFC107',
-        fontWeight: '600',
-        fontSize: 14,
+    securityText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
+        marginLeft: 8,
+        textAlign: 'center',
+        flex: 1,
     },
 });

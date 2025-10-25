@@ -517,7 +517,7 @@ const VolunteerHistoryScreen = ({ navigation, route }) => {
           </Text>
           <TouchableOpacity 
             style={styles.primaryButton}
-            onPress={() => navigation.navigate('LoginScreen')}
+            onPress={() => navigation.navigate('Login')}
             activeOpacity={0.8}
           >
             <Text style={styles.primaryButtonText}>Go to Login</Text>
