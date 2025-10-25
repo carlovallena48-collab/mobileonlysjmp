@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
 
 const sendVerificationEmail = async (email, name, token) => {
   try {
-    const verificationUrl = `http://mobileonlysjmp.onrender.com/api/verify-email?token=${token}`;
+    const verificationUrl = `https://mobileonlysjmp.onrender.com/api/verify-email?token=${token}`;
     
     const mailOptions = {
       from: {

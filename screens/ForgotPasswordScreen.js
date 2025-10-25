@@ -126,7 +126,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         setLoading(true);
         try {
             console.log('📤 Sending verification code...');
-            const response = await axios.post('http://mobileonlysjmp.onrender.com/api/forgot-password', {
+            const response = await axios.post('https://mobileonlysjmp.onrender.com/api/forgot-password', {
                 email: email.trim().toLowerCase(),
             });
 
@@ -214,7 +214,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         setLoading(true);
         try {
             console.log('🔐 Verifying code...');
-            const response = await axios.post('http://mobileonlysjmp.onrender.com/api/verify-reset-code', {
+            const response = await axios.post('https://mobileonlysjmp.onrender.com/api/verify-reset-code', {
                 email: userEmail,
                 code: verificationCodeToVerify,
             });
@@ -253,7 +253,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
         setLoading(true);
         try {
-            await axios.post('http://mobileonlysjmp.onrender.com/api/forgot-password', {
+            await axios.post('https://mobileonlysjmp.onrender.com/api/forgot-password', {
                 email: userEmail,
             });
             setCountdown(60);

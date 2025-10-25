@@ -15,7 +15,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define constants OUTSIDE the component
-const API_URL = "http://mobileonlysjmp.onrender.com/api";
+const API_URL = "https://mobileonlysjmp.onrender.com/api";
 const PRIMARY_COLOR = "#047857";
 const SECONDARY_COLOR = "#34d399";
 const BACKGROUND_COLOR = "#f0fdfa";

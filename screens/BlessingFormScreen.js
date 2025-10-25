@@ -156,7 +156,7 @@ const BlessingFormScreen = () => {
 
             console.log('📤 Submitting Blessing request:', submissionData);
 
-            const response = await fetch('http://mobileonlysjmp.onrender.com/api/blessing_requests', {
+            const response = await fetch('https://mobileonlysjmp.onrender.com/api/blessing_requests', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

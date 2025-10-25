@@ -24,7 +24,7 @@ const BACKGROUND_COLOR = "#f0fdfa";
 const CARD_BACKGROUND = "#ffffff";
 
 // API URL
-const API_URL = "http://mobileonlysjmp.onrender.com/api";
+const API_URL = "https://mobileonlysjmp.onrender.com/api";
 const USER_STORAGE_KEY = '@userData';
 
 // Enhanced Status Badge with Payment Status

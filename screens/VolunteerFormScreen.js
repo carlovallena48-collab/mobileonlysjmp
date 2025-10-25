@@ -52,7 +52,7 @@ const SERVER_ICONS = {
 };
 
 // Your API base URL
-const API_BASE_URL = "http://mobileonlysjmp.onrender.com";
+const API_BASE_URL = "https://mobileonlysjmp.onrender.com";
 
 const VolunteerFormScreen = ({ navigation, route }) => {
   const [selectedServer, setSelectedServer] = useState("");

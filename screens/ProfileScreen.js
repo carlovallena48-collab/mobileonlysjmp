@@ -239,7 +239,7 @@ const ProfileScreen = () => {
     
     const navigation = useNavigation();
     
-    const API_BASE_URL = `http://mobileonlysjmp.onrender.com`; 
+    const API_BASE_URL = `https://mobileonlysjmp.onrender.com`; 
     const PROFILE_IMAGE_DEFAULT = "https://i.ibb.co/L95zB7X/emojiprofile.png";
     const ASYNC_IMAGE_KEY_PREFIX = "@user_profile_image_";
 

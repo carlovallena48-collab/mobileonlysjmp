@@ -53,7 +53,7 @@ export default function LoginScreen({ navigation }) {
 
         setLoading(true);
         try {
-            const response = await axios.post('http://mobileonlysjmp.onrender.com/api/login', {
+            const response = await axios.post('https://mobileonlysjmp.onrender.com/api/login', {
                 email: email.trim().toLowerCase(),
                 password,
             });
@@ -106,7 +106,7 @@ export default function LoginScreen({ navigation }) {
 
     const resendVerification = async (email) => {
         try {
-            const response = await axios.post('http://mobileonlysjmp.onrender.com/api/resend-verification', {
+            const response = await axios.post('https://mobileonlysjmp.onrender.com/api/resend-verification', {
                 email: email.trim().toLowerCase()
             });
             Alert.alert('Success', response.data.message);

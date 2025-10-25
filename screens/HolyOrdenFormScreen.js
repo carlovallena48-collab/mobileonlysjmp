@@ -151,7 +151,7 @@ const HolyOrderForm = () => {
 
       console.log('📤 Submitting Holy Orders request:', submissionData);
       
-      const response = await fetch('http://mobileonlysjmp.onrender.com/api/holy_orders_requests', {
+      const response = await fetch('https://mobileonlysjmp.onrender.com/api/holy_orders_requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

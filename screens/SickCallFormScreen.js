@@ -271,7 +271,7 @@ export default function SickCallFormScreen({ navigation, route }) {
     });
     
     try {
-      const SERVER_URL = 'http://mobileonlysjmp.onrender.com';
+      const SERVER_URL = 'https://mobileonlysjmp.onrender.com';
       
       console.log('🚀 Sending request to:', `${SERVER_URL}/api/sickcall_requests`);
       

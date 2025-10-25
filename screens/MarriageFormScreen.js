@@ -20,7 +20,7 @@ const C = {
     successGreen: '#4CAF50', warningOrange: '#FF9800',
 };
 
-const API_BASE_URL = 'http://mobileonlysjmp.onrender.com'; // Your server IP
+const API_BASE_URL = 'https://mobileonlysjmp.onrender.com'; // Your server IP
 
 // Main MarriageForm Component
 export default function MarriageForm({ navigation, route }) {

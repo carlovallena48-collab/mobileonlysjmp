@@ -160,7 +160,7 @@ const PamisaFormScreen = () => {
 
       console.log('📤 Submitting Pamisa request:', formData);
 
-      const response = await fetch('http://mobileonlysjmp.onrender.com/api/pamisa_requests', {
+      const response = await fetch('https://mobileonlysjmp.onrender.com/api/pamisa_requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

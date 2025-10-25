@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
-const API_URL = "http://mobileonlysjmp.onrender.com/api/first_communion_requests"; 
+const API_URL = "https://mobileonlysjmp.onrender.com/api/first_communion_requests"; 
 
 const Colors = {
   churchGreenPrimary: '#2E7D32',

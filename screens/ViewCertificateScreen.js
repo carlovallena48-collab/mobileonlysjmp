@@ -23,7 +23,7 @@ const SECONDARY_COLOR = '#34d399';
 const BACKGROUND_COLOR = '#f0fdfa';
 const CARD_BACKGROUND = '#ffffff';
 
-const API_URL = "http://mobileonlysjmp.onrender.com/api";
+const API_URL = "https://mobileonlysjmp.onrender.com/api";
 const USER_STORAGE_KEY = '@userData';
 
 // Reason Modal Component

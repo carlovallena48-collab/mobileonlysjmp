@@ -137,7 +137,7 @@ const FuneralFormScreen = () => {
       console.log('📤 Submitting Funeral Service request:', submissionData);
 
       // Replace with your actual API endpoint
-      const response = await fetch('http://mobileonlysjmp.onrender.com/api/funeral_requests', {
+      const response = await fetch('https://mobileonlysjmp.onrender.com/api/funeral_requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
