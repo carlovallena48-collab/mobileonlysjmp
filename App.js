@@ -60,8 +60,8 @@ export default function App() {
         <Stack.Screen name="ScheduleDetailScreen" component={ScheduleDetailScreen} />
         <Stack.Screen name="PamisaForm" component={PamisaFormScreen} />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-   <Stack.Screen  name="NotificationScreen"  component= {NotificationScreen}/>
-       <Stack.Screen name="FirstCommunionForm" component={FirstCommunionFormScreen} />
+        <Stack.Screen  name="NotificationScreen"  component= {NotificationScreen}/>
+        <Stack.Screen name="FirstCommunionForm" component={FirstCommunionFormScreen} />
         <Stack.Screen 
           name="BlessingForm" 
           component={BlessingFormScreen}
@@ -72,7 +72,7 @@ export default function App() {
        <Stack.Screen name="BurialServiceForm" component={BurialServiceFormScreen} />
        <Stack.Screen name="ViewRequestCertificate" component={ViewCertificateScreen} />
        <Stack.Screen 
-  name="VolunteerFormScreen" 
+   name="VolunteerFormScreen" 
   component={VolunteerFormScreen}
   options={{
     headerShown: false,

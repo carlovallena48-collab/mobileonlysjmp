@@ -232,12 +232,8 @@ const RequestCertificateScreen = ({ navigation, route }) => {
   const certificateTypes = [
     "Baptismal Certificate",
     "Marriage Certificate", 
-    "Confirmation Certificate",
-    "Birth Certificate",
-    "Death Certificate",
     "Kumpil Certificate",
-    "Kumpisal Certificate",
-    "Other Certificate"
+  
   ];
 
   return (
